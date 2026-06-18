@@ -465,30 +465,6 @@ export default function SearchPage() {
             <span style={{ color: "var(--text)" }}>al instante</span>
           </h1>
 
-          {/* Subtitle */}
-          <p className="hero-sub" style={{ fontSize: 16, color: "var(--text-muted)", marginBottom: 36, lineHeight: 1.6, maxWidth: 520, margin: "0 auto 36px" }}>
-            Monitorea <strong style={{ color: "var(--text)" }}>31 medios ecuatorianos</strong>, redes sociales y noticias globales.<br />
-            Sentimiento, alcance y tendencias con GPT-4o-mini.
-          </p>
-
-          {/* Stats strip */}
-          <div className="hero-stats" style={{ display: "flex", gap: 0, justifyContent: "center", marginBottom: 40, borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface)" }}>
-            {[
-              { n: "31",     label: "Medios EC" },
-              { n: "5",      label: "Fuentes" },
-              { n: "GPT-4o", label: "Motor IA" },
-              { n: "60d",    label: "Historial" },
-            ].map(({ n, label }, i, arr) => (
-              <div key={label} style={{
-                flex: 1, padding: "18px 12px", textAlign: "center",
-                borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none",
-              }}>
-                <p style={{ fontSize: 22, fontWeight: 900, color: "var(--accent)", lineHeight: 1, marginBottom: 4 }}>{n}</p>
-                <p style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</p>
-              </div>
-            ))}
-          </div>
-
           {/* Search bar */}
           <div className="hero-search" style={{ marginBottom: 20 }}>
             {searchBar(true)}
