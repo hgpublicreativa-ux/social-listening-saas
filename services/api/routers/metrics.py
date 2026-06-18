@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -8,6 +8,16 @@ from models.schemas import MetricsHourly
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/projects/{project_id}/metrics", tags=["metrics"])
+
+
+def _range(from_date: str, to_date: str) -> tuple[datetime, datetime]:
+    """Parse ISO dates. to_date is made inclusive of the whole day so that
+    same-day data (buckets after midnight) is not cut off by a date-only bound."""
+    start = datetime.fromisoformat(from_date)
+    end   = datetime.fromisoformat(to_date)
+    if end.hour == 0 and end.minute == 0 and end.second == 0:
+        end = end + timedelta(days=1)  # include the full to_date day
+    return start, end
 
 
 @router.get("/timeseries", response_model=list[MetricsHourly])
@@ -22,8 +32,9 @@ async def timeseries(
 ):
     table = "metrics_daily" if granularity == "day" else "metrics_hourly"
     col   = "day" if granularity == "day" else "bucket"
-    clauses = ["project_id = :pid", f"{col} >= :from_date", f"{col} <= :to_date"]
-    params  = {"pid": project_id, "from_date": datetime.fromisoformat(from_date), "to_date": datetime.fromisoformat(to_date)}
+    start, end = _range(from_date, to_date)
+    clauses = ["project_id = :pid", f"{col} >= :from_date", f"{col} < :to_date"]
+    params  = {"pid": project_id, "from_date": start, "to_date": end}
 
     if platform:
         clauses.append("platform = :platform")
@@ -60,9 +71,9 @@ async def summary(
         FROM metrics_hourly
         WHERE project_id = :pid
           AND bucket >= :from_date
-          AND bucket <= :to_date
+          AND bucket < :to_date
         GROUP BY platform
-    """), {"pid": project_id, "from_date": datetime.fromisoformat(from_date), "to_date": datetime.fromisoformat(to_date)})
+    """), {"pid": project_id, **dict(zip(("from_date", "to_date"), _range(from_date, to_date)))})
     return [dict(r._mapping) for r in result.fetchall()]
 
 
