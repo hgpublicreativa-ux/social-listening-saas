@@ -56,9 +56,20 @@ class MediaConnector:
 
     @staticmethod
     def _matches(text: str, keyword: str) -> bool:
-        tokens = [t.strip().lower() for t in keyword.replace('"', '').split() if len(t.strip()) > 2]
+        """All tokens in keyword must appear in text (AND logic)."""
+        import re
         haystack = text.lower()
-        return any(tok in haystack for tok in tokens)
+        k = keyword.strip()
+        phrases = re.findall(r'"([^"]+)"', k)
+        for phrase in phrases:
+            if phrase.lower() not in haystack:
+                return False
+        if phrases:
+            return True
+        tokens = [t.strip().lower() for t in k.split() if len(t.strip()) > 2]
+        if not tokens:
+            return False
+        return all(tok in haystack for tok in tokens)
 
     async def _fetch(self, client: httpx.AsyncClient, keyword: str, domain: str) -> list[dict]:
         params = {

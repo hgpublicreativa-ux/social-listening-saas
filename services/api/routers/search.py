@@ -200,10 +200,30 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 
 
 def _matches_query(text: str, q: str) -> bool:
-    """Returns True if any keyword token from q appears in text (case-insensitive)."""
-    tokens = [t.strip().lower() for t in q.replace('"', '').split() if len(t.strip()) > 2]
+    """
+    Returns True if the query matches the article text.
+    - Quoted phrase (e.g. "Daniel Noboa"): exact phrase match in title+text.
+    - Multi-word: ALL tokens must appear (AND logic).
+    - Single word: token must appear in the title or text.
+    Only checks title + summary, never metadata/tags.
+    """
     haystack = text.lower()
-    return any(tok in haystack for tok in tokens)
+    q_clean = q.strip()
+
+    # Exact phrase match for quoted queries
+    import re
+    phrases = re.findall(r'"([^"]+)"', q_clean)
+    for phrase in phrases:
+        if phrase.lower() not in haystack:
+            return False
+    if phrases:
+        return True
+
+    # Multi/single token: ALL must appear (AND)
+    tokens = [t.strip().lower() for t in q_clean.split() if len(t.strip()) > 2]
+    if not tokens:
+        return False
+    return all(tok in haystack for tok in tokens)
 
 
 async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
