@@ -1,17 +1,22 @@
 """
-Real-time search endpoint: queries Twitter (RapidAPI), Google News RSS, and Bluesky
-in parallel and returns combined results within ~5 seconds.
-No background polling needed — results on demand.
+Real-time search: fetches from Twitter, Google News, Bluesky in parallel,
+enriches with GPT-4o-mini sentiment, returns dashboard-style response.
 """
 import asyncio
 import os
+import uuid
 import logging
 from datetime import datetime, timezone
+from collections import defaultdict
 
 import feedparser
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from pydantic import BaseModel
+from redis.asyncio import Redis
+
+from nlp import enrich_batch
+from routers.auth import get_current_user
 
 log = logging.getLogger("api.search")
 
@@ -23,28 +28,70 @@ TWITTER_URL   = f"https://{RAPIDAPI_HOST}/search"
 GNEWS_URL     = "https://news.google.com/rss/search"
 BLUESKY_URL   = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-class SearchResult(BaseModel):
+
+# ── Models ────────────────────────────────────────────────────────────────────
+
+class RawResult(BaseModel):
+    id:          str
     platform:    str
-    title:       str
     text:        str
-    url:         str
-    author:      str
-    published_at: str
+    title:       str = ""
+    url:         str = ""
+    author:      str = ""
+    author_id:   str = ""
+    followers:   int = 0
+    published_at: str = ""
     likes:       int = 0
     shares:      int = 0
     comments:    int = 0
     source:      str = ""
 
 
-def _parse_tw_date(s: str) -> str:
+class EnrichedResult(RawResult):
+    sentiment:       str   = "neutral"
+    sentiment_score: float = 0.5
+    keywords:        list  = []
+    entities:        list  = []
+    summary:         str   = ""
+
+
+class TopAccount(BaseModel):
+    author:       str
+    author_id:    str
+    platform:     str
+    followers:    int
+    mention_count: int
+    sentiment:    str
+
+
+class SearchSummary(BaseModel):
+    total:       int
+    positive:    int
+    negative:    int
+    neutral:     int
+    reach:       int
+    engagement:  int
+
+
+class SearchResponse(BaseModel):
+    query:        str
+    summary:      SearchSummary
+    top_accounts: list[TopAccount]
+    results:      list[EnrichedResult]
+
+
+# ── Fetchers ──────────────────────────────────────────────────────────────────
+
+def _tw_date(s: str) -> str:
     try:
         return datetime.strptime(s, "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc).isoformat()
     except Exception:
         return datetime.now(timezone.utc).isoformat()
 
 
-async def _search_twitter(client: httpx.AsyncClient, q: str) -> list[SearchResult]:
+async def _fetch_twitter(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     if not RAPIDAPI_KEY:
         return []
     try:
@@ -55,12 +102,10 @@ async def _search_twitter(client: httpx.AsyncClient, q: str) -> list[SearchResul
             timeout=10,
         )
         if r.status_code != 200:
-            log.warning("Twitter search HTTP %d", r.status_code)
             return []
         results = []
         for group in r.json().get("entries", []):
-            entries = group.get("entries", [group])
-            for entry in entries:
+            for entry in group.get("entries", [group]):
                 try:
                     result = (
                         entry.get("content", {})
@@ -73,24 +118,25 @@ async def _search_twitter(client: httpx.AsyncClient, q: str) -> list[SearchResul
                     if result.get("__typename") == "TweetWithVisibilityResults":
                         result = result.get("tweet", {})
                     legacy = result.get("legacy", {})
-                    text   = legacy.get("full_text") or legacy.get("text", "")
+                    text = legacy.get("full_text") or legacy.get("text", "")
                     if not text or text.startswith("RT @"):
                         continue
                     user = (
-                        result.get("core", {})
-                              .get("user_results", {})
-                              .get("result", {})
-                              .get("legacy", {})
+                        result.get("core", {}).get("user_results", {})
+                              .get("result", {}).get("legacy", {})
                     )
                     tid = legacy.get("id_str") or result.get("rest_id", "")
                     sn  = user.get("screen_name", "")
-                    results.append(SearchResult(
+                    results.append(RawResult(
+                        id=tid or str(uuid.uuid4()),
                         platform="twitter",
+                        text=text[:1000],
                         title=f"@{sn}",
-                        text=text[:500],
                         url=f"https://x.com/{sn}/status/{tid}",
                         author=user.get("name") or sn,
-                        published_at=_parse_tw_date(legacy.get("created_at", "")),
+                        author_id=sn,
+                        followers=int(user.get("followers_count", 0) or 0),
+                        published_at=_tw_date(legacy.get("created_at", "")),
                         likes=int(legacy.get("favorite_count", 0) or 0),
                         shares=int(legacy.get("retweet_count", 0) or 0),
                         comments=int(legacy.get("reply_count", 0) or 0),
@@ -98,13 +144,13 @@ async def _search_twitter(client: httpx.AsyncClient, q: str) -> list[SearchResul
                     ))
                 except Exception:
                     continue
-        return results[:25]
+        return results[:30]
     except Exception as exc:
-        log.warning("Twitter search error: %s", exc)
+        log.warning("Twitter fetch error: %s", exc)
         return []
 
 
-async def _search_gnews(client: httpx.AsyncClient, q: str) -> list[SearchResult]:
+async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
         r = await client.get(
             GNEWS_URL,
@@ -116,15 +162,23 @@ async def _search_gnews(client: httpx.AsyncClient, q: str) -> list[SearchResult]
         results = []
         for e in feed.entries[:20]:
             try:
-                pub = datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat() if e.get("published_parsed") else datetime.now(timezone.utc).isoformat()
+                pub = (
+                    datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+                    if e.get("published_parsed")
+                    else datetime.now(timezone.utc).isoformat()
+                )
                 src = e.get("source", {})
                 src_name = src.get("title", "Google News") if isinstance(src, dict) else "Google News"
-                results.append(SearchResult(
+                text = (e.get("summary") or e.get("title", ""))
+                results.append(RawResult(
+                    id=e.get("id") or e.get("link") or str(uuid.uuid4()),
                     platform="web",
+                    text=text[:1000],
                     title=e.get("title", ""),
-                    text=(e.get("summary") or e.get("title", ""))[:500],
                     url=e.get("link", ""),
                     author=src_name,
+                    author_id=src_name,
+                    followers=0,
                     published_at=pub,
                     source="news.google.com",
                 ))
@@ -132,17 +186,13 @@ async def _search_gnews(client: httpx.AsyncClient, q: str) -> list[SearchResult]
                 continue
         return results
     except Exception as exc:
-        log.warning("Google News search error: %s", exc)
+        log.warning("Google News fetch error: %s", exc)
         return []
 
 
-async def _search_bluesky(client: httpx.AsyncClient, q: str) -> list[SearchResult]:
+async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
-        r = await client.get(
-            BLUESKY_URL,
-            params={"q": q, "limit": 20, "lang": "es"},
-            timeout=10,
-        )
+        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 25, "lang": "es"}, timeout=10)
         if r.status_code != 200:
             return []
         results = []
@@ -160,12 +210,15 @@ async def _search_bluesky(client: httpx.AsyncClient, q: str) -> list[SearchResul
                     pub = datetime.fromisoformat(created.replace("Z", "+00:00")).isoformat()
                 except Exception:
                     pub = datetime.now(timezone.utc).isoformat()
-                results.append(SearchResult(
+                results.append(RawResult(
+                    id=uri or str(uuid.uuid4()),
                     platform="bluesky",
+                    text=text[:1000],
                     title=f"@{handle}",
-                    text=text[:500],
                     url=f"https://bsky.app/profile/{handle}/post/{uri.split('/')[-1]}",
                     author=author.get("displayName") or handle,
+                    author_id=handle,
+                    followers=0,
                     published_at=pub,
                     likes=int(post.get("likeCount", 0) or 0),
                     shares=int(post.get("repostCount", 0) or 0),
@@ -176,30 +229,96 @@ async def _search_bluesky(client: httpx.AsyncClient, q: str) -> list[SearchResul
                 continue
         return results
     except Exception as exc:
-        log.warning("Bluesky search error: %s", exc)
+        log.warning("Bluesky fetch error: %s", exc)
         return []
 
 
-@router.get("", response_model=list[SearchResult])
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+@router.get("", response_model=SearchResponse)
 async def live_search(
-    q:       str   = Query(..., min_length=1, description="Keyword to search"),
-    sources: str   = Query("twitter,web,bluesky", description="Comma-separated sources"),
-    limit:   int   = Query(60, le=100),
+    q:       str = Query(..., min_length=1),
+    sources: str = Query("twitter,web,bluesky"),
+    _user =  Depends(get_current_user),
 ):
-    """Search Twitter, Google News, and Bluesky in real-time."""
     src_list = [s.strip() for s in sources.split(",")]
+    redis    = Redis.from_url(REDIS_URL, decode_responses=True)
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        tasks = []
-        if "twitter" in src_list:
-            tasks.append(_search_twitter(client, q))
-        if "web" in src_list:
-            tasks.append(_search_gnews(client, q))
-        if "bluesky" in src_list:
-            tasks.append(_search_bluesky(client, q))
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            tasks = []
+            if "twitter" in src_list:
+                tasks.append(_fetch_twitter(client, q))
+            if "web" in src_list:
+                tasks.append(_fetch_gnews(client, q))
+            if "bluesky" in src_list:
+                tasks.append(_fetch_bluesky(client, q))
+            fetched_batches = await asyncio.gather(*tasks)
 
-        results_nested = await asyncio.gather(*tasks)
+        raw: list[RawResult] = [r for batch in fetched_batches for r in batch]
+        raw.sort(key=lambda r: r.published_at, reverse=True)
 
-    combined = [r for batch in results_nested for r in batch]
-    combined.sort(key=lambda r: r.published_at, reverse=True)
-    return combined[:limit]
+        # NLP enrichment
+        nlp_map = await enrich_batch(redis, [{"id": r.id, "text": r.text} for r in raw])
+
+        enriched: list[EnrichedResult] = []
+        for r in raw:
+            nlp = nlp_map.get(r.id, {})
+            enriched.append(EnrichedResult(
+                **r.model_dump(),
+                sentiment=       nlp.get("sentiment", "neutral"),
+                sentiment_score= nlp.get("sentiment_score", 0.5),
+                keywords=        nlp.get("keywords", []),
+                entities=        nlp.get("entities", []),
+                summary=         nlp.get("summary", ""),
+            ))
+
+        # Aggregate summary
+        pos = sum(1 for r in enriched if r.sentiment == "positive")
+        neg = sum(1 for r in enriched if r.sentiment == "negative")
+        neu = len(enriched) - pos - neg
+        reach      = sum(r.followers for r in enriched)
+        engagement = sum(r.likes + r.shares + r.comments for r in enriched)
+
+        # Top accounts
+        acct_map: dict[str, dict] = defaultdict(lambda: {"count": 0, "followers": 0, "sentiments": []})
+        for r in enriched:
+            key = f"{r.platform}:{r.author_id}"
+            acct_map[key]["author"]    = r.author
+            acct_map[key]["author_id"] = r.author_id
+            acct_map[key]["platform"]  = r.platform
+            acct_map[key]["followers"] = max(acct_map[key]["followers"], r.followers)
+            acct_map[key]["count"]    += 1
+            acct_map[key]["sentiments"].append(r.sentiment)
+
+        top_accounts = sorted(
+            [
+                TopAccount(
+                    author=       v["author"],
+                    author_id=    v["author_id"],
+                    platform=     v["platform"],
+                    followers=    v["followers"],
+                    mention_count=v["count"],
+                    sentiment=    max(set(v["sentiments"]), key=v["sentiments"].count),
+                )
+                for v in acct_map.values()
+            ],
+            key=lambda a: (a.mention_count, a.followers),
+            reverse=True,
+        )[:10]
+
+        return SearchResponse(
+            query=q,
+            summary=SearchSummary(
+                total=len(enriched),
+                positive=pos,
+                negative=neg,
+                neutral=neu,
+                reach=reach,
+                engagement=engagement,
+            ),
+            top_accounts=top_accounts,
+            results=enriched,
+        )
+    finally:
+        await redis.aclose()
