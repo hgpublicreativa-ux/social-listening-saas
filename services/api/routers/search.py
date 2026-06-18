@@ -159,17 +159,18 @@ async def _fetch_twitter(client: httpx.AsyncClient, q: str) -> list[RawResult]:
         return []
 
 
-async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
+async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web", extra: str = "") -> list[RawResult]:
+    query = f"{q} {extra}".strip() if extra else q
     try:
         r = await client.get(
             GNEWS_URL,
-            params={"q": q, "hl": "es", "gl": "EC", "ceid": "EC:es"},
+            params={"q": query, "hl": "es", "gl": "EC", "ceid": "EC:es"},
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
         )
         feed = feedparser.parse(r.text)
         results = []
-        for e in feed.entries[:12]:
+        for e in feed.entries[:15]:
             try:
                 pub = (
                     datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
@@ -181,7 +182,7 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                 text = (e.get("summary") or e.get("title", ""))
                 results.append(RawResult(
                     id=e.get("id") or e.get("link") or str(uuid.uuid4()),
-                    platform="web",
+                    platform=platform,
                     text=text[:1000],
                     title=e.get("title", ""),
                     url=e.get("link", ""),
@@ -393,7 +394,9 @@ async def live_search(
             if "twitter" in src_list:
                 tasks.append(_fetch_twitter(client, q))
             if "web" in src_list:
-                tasks.append(_fetch_gnews(client, q))
+                tasks.append(_fetch_gnews(client, q, platform="web"))
+            if "gnews_ec" in src_list:
+                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", extra="Ecuador"))
             if "bluesky" in src_list:
                 tasks.append(_fetch_bluesky(client, q))
             if "media" in src_list:

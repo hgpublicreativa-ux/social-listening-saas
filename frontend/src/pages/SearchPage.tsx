@@ -26,9 +26,9 @@ interface SearchResponse {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", bluesky: "☁", media: "📺" };
-const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", bluesky: "#0085ff", media: "#e3a000" };
-const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", bluesky: "Bluesky", media: "Medios EC" };
+const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", bluesky: "☁", media: "📺", gnews_ec: "🇪🇨" };
+const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", bluesky: "#0085ff", media: "#e3a000", gnews_ec: "#34a853" };
+const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", bluesky: "Bluesky", media: "Medios EC", gnews_ec: "Google News EC" };
 
 const SENT_COLOR: Record<string, string> = {
   positive: "#3fb950", negative: "#f85149", neutral: "#8b949e",
@@ -37,7 +37,7 @@ const SENT_BG: Record<string, string> = {
   positive: "rgba(63,185,80,.15)", negative: "rgba(248,81,73,.15)", neutral: "rgba(139,148,158,.12)",
 };
 
-const SOURCE_KEYS = ["twitter", "web", "bluesky", "media"] as const;
+const SOURCE_KEYS = ["twitter", "web", "gnews_ec", "bluesky", "media"] as const;
 
 const DATE_PRESETS = [
   { label: "7d",  days: 7 },
@@ -147,8 +147,8 @@ function ResultCard({ r }: { r: EnrichedResult }) {
 export default function SearchPage() {
   const [input,      setInput]      = useState("");
   const [query,      setQuery]      = useState("");
-  const [sources,    setSources]    = useState<string[]>(["twitter", "web", "bluesky", "media"]);
-  const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "bluesky" | "media">("all");
+  const [sources,    setSources]    = useState<string[]>(["twitter", "web", "gnews_ec", "bluesky", "media"]);
+  const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "bluesky" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
   const [dateDays,   setDateDays]   = useState(60);
 
@@ -174,10 +174,11 @@ export default function SearchPage() {
 
   const all = filterByDays(data?.results ?? [], dateDays);
   const byPlatform = {
-    twitter: all.filter(r => r.platform === "twitter"),
-    web:     all.filter(r => r.platform === "web"),
-    bluesky: all.filter(r => r.platform === "bluesky"),
-    media:   all.filter(r => r.platform === "media"),
+    twitter:  all.filter(r => r.platform === "twitter"),
+    web:      all.filter(r => r.platform === "web"),
+    gnews_ec: all.filter(r => r.platform === "gnews_ec"),
+    bluesky:  all.filter(r => r.platform === "bluesky"),
+    media:    all.filter(r => r.platform === "media"),
   };
 
   const tabResults = tab === "all" ? all : byPlatform[tab] ?? [];
@@ -311,11 +312,12 @@ export default function SearchPage() {
               {/* Platform tabs */}
               <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
                 {[
-                  { key: "all",     label: `Todos (${all.length})` },
-                  { key: "twitter", label: `𝕏 Twitter (${byPlatform.twitter.length})` },
-                  { key: "web",     label: `📰 Noticias (${byPlatform.web.length})` },
-                  { key: "bluesky", label: `☁ Bluesky (${byPlatform.bluesky.length})` },
-                  { key: "media",   label: `📺 Medios EC (${byPlatform.media.length})` },
+                  { key: "all",      label: `Todos (${all.length})` },
+                  { key: "twitter",  label: `𝕏 Twitter (${byPlatform.twitter.length})` },
+                  { key: "web",      label: `📰 Google News (${byPlatform.web.length})` },
+                  { key: "gnews_ec", label: `🇪🇨 Google News EC (${byPlatform.gnews_ec.length})` },
+                  { key: "bluesky",  label: `☁ Bluesky (${byPlatform.bluesky.length})` },
+                  { key: "media",    label: `📺 Medios EC (${byPlatform.media.length})` },
                 ].map(({ key, label }) => (
                   <button key={key} onClick={() => setTab(key as any)} style={{
                     background:   "transparent",
