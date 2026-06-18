@@ -62,7 +62,7 @@ class WebScraperConnector:
         try:
             r = await client.get(feed_url, follow_redirects=True, timeout=15)
             r.raise_for_status()
-            feed    = feedparser.parse(r.text)
+            feed    = feedparser.parse(r.content)
             domain  = urlparse(feed_url).netloc
             new_cnt = 0
 

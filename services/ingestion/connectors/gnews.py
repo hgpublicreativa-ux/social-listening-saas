@@ -32,7 +32,7 @@ class GoogleNewsConnector:
         params = {"q": keyword, "hl": "es", "gl": "EC", "ceid": "EC:es"}
         r = await client.get(BASE_URL, params=params, timeout=20)
         r.raise_for_status()
-        feed = feedparser.parse(r.text)
+        feed = feedparser.parse(r.content)
         return feed.entries
 
     async def run(self):

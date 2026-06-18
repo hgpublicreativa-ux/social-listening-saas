@@ -37,7 +37,36 @@ MEDIA_DOMAINS = [
     "eluniverso.com",
 ]
 
+# Whitelist of Ecuadorian news outlets — used to filter Google News EC results
+EC_MEDIA_DOMAINS = {
+    "eluniverso.com", "elcomercio.com", "primicias.ec", "ecuavisa.com",
+    "teleamazonas.com", "extra.ec", "expreso.ec", "lahora.com.ec",
+    "eltelegrafo.com.ec", "metroecuador.com.ec", "vistazo.com", "gk.city",
+    "ecuadorinmediato.com", "elmercurio.com.ec", "eldiario.ec", "cronica.com.ec",
+    "larepublica.ec", "elnorte.ec", "planv.com.ec", "4pelagatos.com",
+    "wambra.ec", "pichinchacomunicaciones.com.ec", "radiopichincha.com",
+    "ecuadorenvivo.com", "ecuadoruniversitario.com", "lagacetaecuador.com",
+    "diariocorreo.com.ec", "elproductor.com", "elcomercio.com.ec",
+    "ecuador.com", "ecuavisa.tv", "rts.com.ec", "tctelevision.com",
+    "ecuadortv.ec", "elobservador.ec", "surtidordenoticias.com",
+    "primicias.com.ec", "edicionmedica.ec", "revistagestion.ec",
+    "elcomercio", "diarioextra.ec",
+}
+
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+
+def _source_domain(entry) -> str:
+    """Extracts publisher domain from a Google News RSS entry's <source> tag."""
+    src = entry.get("source", {})
+    href = ""
+    if isinstance(src, dict):
+        href = src.get("href", "") or src.get("url", "")
+    if not href:
+        return ""
+    from urllib.parse import urlparse
+    netloc = urlparse(href).netloc.lower()
+    return netloc[4:] if netloc.startswith("www.") else netloc
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -153,16 +182,25 @@ async def _fetch_twitter(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                     ))
                 except Exception:
                     continue
-        return results[:30]
+        return results[:40]
     except Exception as exc:
         log.warning("Twitter fetch error: %s", exc)
         return []
 
 
-async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web", ec_only: bool = False) -> list[RawResult]:
-    params: dict = {"q": q, "hl": "es", "gl": "EC", "ceid": "EC:es"}
-    if ec_only:
-        params["cr"] = "countryEC"   # restrict to sources from Ecuador
+async def _fetch_gnews(
+    client: httpx.AsyncClient,
+    q: str,
+    platform: str = "web",
+    ec_only: bool = False,
+    worldwide: bool = False,
+    limit: int = 40,
+) -> list[RawResult]:
+    # Worldwide → broad Latin-American Spanish locale; EC → Ecuador locale
+    if worldwide:
+        params: dict = {"q": q, "hl": "es-419", "gl": "US", "ceid": "US:es-419"}
+    else:
+        params = {"q": q, "hl": "es", "gl": "EC", "ceid": "EC:es"}
     try:
         r = await client.get(
             GNEWS_URL,
@@ -170,10 +208,16 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web",
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
         )
-        feed = feedparser.parse(r.text)
+        feed = feedparser.parse(r.content)
         results = []
-        for e in feed.entries[:15]:
+        for e in feed.entries:
+            if len(results) >= limit:
+                break
             try:
+                dom = _source_domain(e)
+                # EC-only: keep whitelisted outlets OR any .ec domain (Ecuadorian)
+                if ec_only and not (dom in EC_MEDIA_DOMAINS or dom.endswith(".ec")):
+                    continue
                 pub = (
                     datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
                     if e.get("published_parsed")
@@ -192,7 +236,7 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web",
                     author_id=src_name,
                     followers=0,
                     published_at=pub,
-                    source="news.google.com",
+                    source=dom or "news.google.com",
                 ))
             except Exception:
                 continue
@@ -301,7 +345,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             r = await client.get(url, headers=HEADERS_MEDIA, timeout=12)
             if r.status_code != 200:
                 return []
-            feed = feedparser.parse(r.text)
+            feed = feedparser.parse(r.content)
             return _parse_entries(feed.entries, domain, limit=20)
         except Exception as exc:
             log.debug("Site RSS error [%s]: %s", domain, exc)
@@ -316,7 +360,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                 headers=HEADERS_MEDIA,
                 timeout=12,
             )
-            feed = feedparser.parse(r.text)
+            feed = feedparser.parse(r.content)
             return _parse_entries(feed.entries, domain, limit=15)
         except Exception as exc:
             log.debug("GNews site error [%s]: %s", domain, exc)
@@ -333,12 +377,12 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
     results = [r for batch in batches for r in batch]
     results.sort(key=lambda r: r.published_at, reverse=True)
-    return results
+    return results[:40]
 
 
 async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
-        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 25}, timeout=10)
+        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 40}, timeout=10)
         if r.status_code != 200:
             return []
         results = []
@@ -396,9 +440,9 @@ async def live_search(
             if "twitter" in src_list:
                 tasks.append(_fetch_twitter(client, q))
             if "web" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="web"))
+                tasks.append(_fetch_gnews(client, q, platform="web", worldwide=True, limit=40))
             if "gnews_ec" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True))
+                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True, limit=40))
             if "bluesky" in src_list:
                 tasks.append(_fetch_bluesky(client, q))
             if "media" in src_list:

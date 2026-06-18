@@ -81,7 +81,7 @@ class MediaConnector:
         try:
             r = await client.get(GNEWS_URL, params=params, timeout=15)
             r.raise_for_status()
-            feed = feedparser.parse(r.text)
+            feed = feedparser.parse(r.content)
             filtered = []
             for e in feed.entries:
                 text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
