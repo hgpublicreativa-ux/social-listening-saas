@@ -6,7 +6,7 @@ import asyncio
 import os
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 import feedparser
@@ -201,17 +201,16 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 
 def _matches_query(text: str, q: str) -> bool:
     """
-    Returns True if the query matches the article text.
-    - Quoted phrase (e.g. "Daniel Noboa"): exact phrase match in title+text.
-    - Multi-word: ALL tokens must appear (AND logic).
-    - Single word: token must appear in the title or text.
-    Only checks title + summary, never metadata/tags.
+    Returns True if the article text is relevant to the query.
+    - Quoted phrase: exact phrase match required.
+    - Multi/single word: at least ONE significant token (≥4 chars) must appear.
+    Only evaluates title + summary text passed in, never metadata.
     """
+    import re
     haystack = text.lower()
     q_clean = q.strip()
 
-    # Exact phrase match for quoted queries
-    import re
+    # Exact phrase for quoted terms
     phrases = re.findall(r'"([^"]+)"', q_clean)
     for phrase in phrases:
         if phrase.lower() not in haystack:
@@ -219,11 +218,12 @@ def _matches_query(text: str, q: str) -> bool:
     if phrases:
         return True
 
-    # Multi/single token: ALL must appear (AND)
-    tokens = [t.strip().lower() for t in q_clean.split() if len(t.strip()) > 2]
+    # Any significant token must appear (OR, min 4 chars to skip stop words)
+    tokens = [t.strip().lower() for t in re.sub(r'"[^"]*"', '', q_clean).split() if len(t.strip()) >= 4]
     if not tokens:
-        return False
-    return all(tok in haystack for tok in tokens)
+        # fallback: any token ≥2 chars
+        tokens = [t.strip().lower() for t in q_clean.split() if len(t.strip()) >= 2]
+    return any(tok in haystack for tok in tokens)
 
 
 async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
@@ -238,7 +238,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             )
             feed = feedparser.parse(r.text)
             out  = []
-            for e in feed.entries[:8]:
+            for e in feed.entries[:15]:
                 try:
                     pub = (
                         datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
@@ -342,6 +342,17 @@ async def live_search(
             fetched_batches = await asyncio.gather(*tasks)
 
         raw: list[RawResult] = [r for batch in fetched_batches for r in batch]
+        # Limit to last 60 days
+        cutoff_60d = datetime.now(timezone.utc) - timedelta(days=60)
+        def _within_60d(r: RawResult) -> bool:
+            try:
+                dt = datetime.fromisoformat(r.published_at.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt >= cutoff_60d
+            except Exception:
+                return True
+        raw = [r for r in raw if _within_60d(r)]
         raw.sort(key=lambda r: r.published_at, reverse=True)
 
         # NLP enrichment

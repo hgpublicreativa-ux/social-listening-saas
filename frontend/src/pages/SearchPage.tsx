@@ -40,11 +40,10 @@ const SENT_BG: Record<string, string> = {
 const SOURCE_KEYS = ["twitter", "web", "bluesky", "media"] as const;
 
 const DATE_PRESETS = [
-  { label: "Todo", days: 0 },
-  { label: "7d",   days: 7 },
-  { label: "14d",  days: 14 },
-  { label: "30d",  days: 30 },
-  { label: "60d",  days: 60 },
+  { label: "7d",  days: 7 },
+  { label: "14d", days: 14 },
+  { label: "30d", days: 30 },
+  { label: "60d", days: 60 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -151,7 +150,7 @@ export default function SearchPage() {
   const [sources,    setSources]    = useState<string[]>(["twitter", "web", "bluesky", "media"]);
   const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "bluesky" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
-  const [dateDays,   setDateDays]   = useState(0);
+  const [dateDays,   setDateDays]   = useState(60);
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
     queryKey:  ["live-search", query, sources.join(",")],
@@ -165,7 +164,7 @@ export default function SearchPage() {
     const q = input.trim();
     if (!q) return;
     setSentFilter("");
-    setDateDays(0);
+    setDateDays(60);
     setTab("all");
     setQuery(q);
   };
