@@ -13,7 +13,7 @@ from utils.normalizer import make_envelope
 log = logging.getLogger("ingestion.twitter_rapid")
 
 RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY", "")
-RAPIDAPI_HOST = "twttrapi.p.rapidapi.com"
+RAPIDAPI_HOST = "twittr-v2-fastest-twitter-x-api-150k-requests-for-15.p.rapidapi.com"
 SEARCH_URL    = f"https://{RAPIDAPI_HOST}/search-tweets"
 POLL_SECONDS  = 900  # 15 min
 
