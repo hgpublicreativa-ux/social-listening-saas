@@ -159,12 +159,14 @@ async def _fetch_twitter(client: httpx.AsyncClient, q: str) -> list[RawResult]:
         return []
 
 
-async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web", extra: str = "") -> list[RawResult]:
-    query = f"{q} {extra}".strip() if extra else q
+async def _fetch_gnews(client: httpx.AsyncClient, q: str, platform: str = "web", ec_only: bool = False) -> list[RawResult]:
+    params: dict = {"q": q, "hl": "es", "gl": "EC", "ceid": "EC:es"}
+    if ec_only:
+        params["cr"] = "countryEC"   # restrict to sources from Ecuador
     try:
         r = await client.get(
             GNEWS_URL,
-            params={"q": query, "hl": "es", "gl": "EC", "ceid": "EC:es"},
+            params=params,
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
         )
@@ -396,7 +398,7 @@ async def live_search(
             if "web" in src_list:
                 tasks.append(_fetch_gnews(client, q, platform="web"))
             if "gnews_ec" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", extra="Ecuador"))
+                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True))
             if "bluesky" in src_list:
                 tasks.append(_fetch_bluesky(client, q))
             if "media" in src_list:
