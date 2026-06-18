@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import feedparser
 import httpx
-from aiokafka import AIOKafkaProducer
+from streams import StreamProducer
 from redis.asyncio import Redis
 
 from utils.dedup import is_duplicate, is_content_duplicate
@@ -25,7 +25,7 @@ RSS_FEEDS = [
 
 
 class WebScraperConnector:
-    def __init__(self, producer: AIOKafkaProducer, redis: Redis, project_id: str, keywords: list[str]):
+    def __init__(self, producer: StreamProducer, redis: Redis, project_id: str, keywords: list[str]):
         self.producer   = producer
         self.redis      = redis
         self.project_id = project_id

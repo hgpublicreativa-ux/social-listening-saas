@@ -4,34 +4,29 @@ import logging
 import os
 import uuid
 
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from redis.asyncio import Redis
-from kafka import kafka_config
-from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 from dotenv import load_dotenv
 
+from streams import StreamConsumer, StreamProducer
 from processor import process_mention
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("nlp_worker.main")
 
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
-REDIS_URL       = os.getenv("REDIS_URL", "redis://localhost:6379")
-DATABASE_URL    = os.getenv("DATABASE_URL")
-ES_URL          = os.getenv("ES_URL", "http://localhost:9200")
+REDIS_URL    = os.getenv("REDIS_URL", "redis://localhost:6379")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine      = create_async_engine(DATABASE_URL, pool_size=5)
+engine            = create_async_engine(DATABASE_URL, pool_size=5)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def upsert_profile(session: AsyncSession, author: dict, platform: str) -> str | None:
     if not author.get("platform_id") and not author.get("username"):
         return None
-
     platform_id = author.get("platform_id") or author.get("username")
     q = await session.execute(text("""
         INSERT INTO social_profiles(platform, platform_id, username, display_name, followers, verified)
@@ -91,75 +86,46 @@ async def save_mention(session: AsyncSession, mention: dict, nlp: dict, profile_
     })
 
 
-async def index_to_es(es: AsyncElasticsearch, mention: dict, nlp: dict):
-    doc = {
-        "project_id":      mention["project_id"],
-        "platform":        mention["platform"],
-        "platform_post_id": mention["platform_post_id"],
-        "content_text":    mention.get("content_text"),
-        "sentiment":       nlp.get("sentiment"),
-        "keywords":        nlp.get("keywords", []),
-        "entities":        nlp.get("entities", []),
-        "published_at":    mention.get("published_at"),
-        "reach_score":     mention.get("author", {}).get("followers", 0),
-    }
-    await es.index(index="mentions", id=mention.get("platform_post_id"), document=doc)
-
-
 async def run():
     redis    = Redis.from_url(REDIS_URL, decode_responses=True)
-    es       = AsyncElasticsearch([ES_URL])
-
-    kc = kafka_config()
-    consumer = AIOKafkaConsumer(
-        "raw-mentions",
-        bootstrap_servers=KAFKA_BOOTSTRAP,
-        group_id="nlp-workers",
-        value_deserializer=lambda v: json.loads(v.decode()),
-        auto_offset_reset="latest",
-        **kc,
-    )
-    producer = AIOKafkaProducer(
-        bootstrap_servers=KAFKA_BOOTSTRAP,
-        value_serializer=lambda v: json.dumps(v).encode(),
-        **kc,
-    )
-
+    consumer = StreamConsumer(redis, "raw-mentions", "nlp-workers", "nlp-1")
+    producer = StreamProducer(redis)
     await consumer.start()
-    await producer.start()
-    log.info("NLP worker started, consuming raw-mentions")
 
-    try:
-        async for msg in consumer:
-            envelope = msg.value
-            mention  = envelope.get("raw", {})
+    log.info("NLP worker started — consuming raw-mentions via Redis Streams")
 
-            if not mention.get("platform_post_id"):
-                continue
+    async for msg in consumer:
+        envelope = msg.value
+        mention  = envelope.get("raw", {})
 
-            mention["id"] = str(uuid.uuid4())
+        if not mention.get("platform_post_id"):
+            continue
 
-            try:
-                nlp = await process_mention(redis, mention)
-            except Exception as exc:
-                log.error("NLP processing failed: %s", exc)
-                continue
+        mention["id"] = str(uuid.uuid4())
 
-            async with AsyncSessionLocal() as session:
-                async with session.begin():
-                    profile_id = await upsert_profile(session, mention.get("author", {}), mention["platform"])
-                    await save_mention(session, mention, nlp, profile_id)
+        try:
+            nlp = await process_mention(redis, mention)
+        except Exception as exc:
+            log.error("NLP processing failed: %s", exc)
+            continue
 
-            await index_to_es(es, mention, nlp)
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                profile_id = await upsert_profile(session, mention.get("author", {}), mention["platform"])
+                await save_mention(session, mention, nlp, profile_id)
 
-            enriched = {**envelope, "raw": {**mention}, "nlp": nlp}
-            await producer.send("enriched-mentions", value=enriched, key=msg.key)
+        enriched = {**envelope, "raw": {**mention}, "nlp": nlp}
+        await producer.send("enriched-mentions", value=enriched)
 
-    finally:
-        await consumer.stop()
-        await producer.stop()
-        await redis.aclose()
-        await es.close()
+        # Publish to Redis pubsub for WebSocket feed
+        await redis.publish(f"mentions:{mention['project_id']}", json.dumps({
+            "platform":    mention["platform"],
+            "text":        (mention.get("content_text") or "")[:200],
+            "sentiment":   nlp.get("sentiment"),
+            "published_at": mention.get("published_at"),
+        }))
+
+    await redis.aclose()
 
 
 if __name__ == "__main__":

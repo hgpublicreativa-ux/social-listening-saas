@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from aiokafka import AIOKafkaProducer
+from streams import StreamProducer
 from redis.asyncio import Redis
 
 from utils.dedup import is_duplicate
@@ -20,7 +20,7 @@ POLL_SECONDS  = 600  # 10 minutes (Research API quotas)
 
 
 class TikTokConnector:
-    def __init__(self, producer: AIOKafkaProducer, redis: Redis, project_id: str, keywords: list[str]):
+    def __init__(self, producer: StreamProducer, redis: Redis, project_id: str, keywords: list[str]):
         self.producer    = producer
         self.redis       = redis
         self.project_id  = project_id

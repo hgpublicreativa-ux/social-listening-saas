@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from aiokafka import AIOKafkaProducer
+from streams import StreamProducer
 from redis.asyncio import Redis
 from tenacity import retry, wait_exponential, stop_after_attempt
 
@@ -20,7 +20,7 @@ POLL_SECONDS = 300  # 5 minutes
 
 
 class YouTubeConnector:
-    def __init__(self, producer: AIOKafkaProducer, redis: Redis, project_id: str, keywords: list[str]):
+    def __init__(self, producer: StreamProducer, redis: Redis, project_id: str, keywords: list[str]):
         self.producer   = producer
         self.redis      = redis
         self.project_id = project_id
