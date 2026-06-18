@@ -27,6 +27,25 @@ Texts:
 
 Return ONLY the JSON array, no markdown, no explanation."""
 
+PROMPT_WITH_CATEGORY = """\
+You are a social media analyst. Analyze the following texts and return ONLY a valid JSON array.
+For each item include:
+- "id": the same id provided
+- "sentiment": "positive" | "negative" | "neutral"
+- "sentiment_score": float 0-1
+- "keywords": array of up to 5 relevant keywords
+- "entities": array of {{"name": str, "type": "PERSON"|"BRAND"|"PLACE"|"EVENT"|"OTHER"}}
+- "summary": one-sentence summary in the same language as the text
+- "category": if the text belongs to category "{category}", set to "{category}", otherwise "other"
+- "category_confidence": float 0-1 indicating confidence the text matches the requested category
+
+Target category: {category}
+
+Texts:
+{texts_json}
+
+Return ONLY the JSON array, no markdown, no explanation."""
+
 
 def _cache_key(text: str) -> str:
     return "nlp:cache:" + hashlib.sha256(text[:400].encode()).hexdigest()
@@ -44,9 +63,10 @@ def _fallback(item_id: str, text: str) -> dict:
     }
 
 
-async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
+async def enrich_batch(redis: Redis, items: list[dict], category: str = None) -> dict[str, dict]:
     """
     items: list of {"id": str, "text": str}
+    category: optional category name to classify texts into
     returns: dict mapping id -> nlp result
     """
     results: dict[str, dict] = {}
@@ -63,11 +83,12 @@ async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
     async def _process_batch(batch: list[dict]) -> None:
         payload = [{"id": x["id"], "text": x["text"][:300]} for x in batch]
         try:
+            prompt = PROMPT_WITH_CATEGORY.format(category=category) if category else PROMPT
             resp = await _client.chat.completions.create(
                 model="gpt-4o-mini",
                 max_tokens=4096,
                 temperature=0,
-                messages=[{"role": "user", "content": PROMPT.format(
+                messages=[{"role": "user", "content": prompt.format(
                     texts_json=json.dumps(payload, ensure_ascii=False)
                 )}],
             )

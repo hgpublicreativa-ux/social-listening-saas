@@ -493,6 +493,14 @@ async def live_search(
     sources: str = Query("twitter,web,bluesky,media"),
     _user =  Depends(get_current_user),
 ):
+    # Parse category filter from query: "categoria: XXX"
+    category = None
+    query_for_search = q
+    if "categoria:" in q.lower():
+        parts = q.lower().split("categoria:", 1)
+        category = parts[1].strip().split()[0] if len(parts) > 1 else None
+        query_for_search = parts[0].strip() if parts[0] else q
+
     src_list = [s.strip() for s in sources.split(",")]
     redis    = Redis.from_url(REDIS_URL, decode_responses=True)
 
@@ -500,15 +508,15 @@ async def live_search(
         async with httpx.AsyncClient(follow_redirects=True) as client:
             tasks = []
             if "twitter" in src_list:
-                tasks.append(_fetch_twitter(client, q))
+                tasks.append(_fetch_twitter(client, query_for_search))
             if "web" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="web", worldwide=True, limit=60))
+                tasks.append(_fetch_gnews(client, query_for_search, platform="web", worldwide=True, limit=60))
             if "gnews_ec" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True, limit=60))
+                tasks.append(_fetch_gnews(client, query_for_search, platform="gnews_ec", ec_only=True, limit=60))
             if "reddit" in src_list:
-                tasks.append(_fetch_reddit(client, q))
+                tasks.append(_fetch_reddit(client, query_for_search))
             if "media" in src_list:
-                tasks.append(_fetch_media(client, q))
+                tasks.append(_fetch_media(client, query_for_search))
             fetched_batches = await asyncio.gather(*tasks)
 
         raw: list[RawResult] = [r for batch in fetched_batches for r in batch]
@@ -526,7 +534,7 @@ async def live_search(
         raw.sort(key=lambda r: r.published_at, reverse=True)
 
         # NLP enrichment
-        nlp_map = await enrich_batch(redis, [{"id": r.id, "text": r.text} for r in raw])
+        nlp_map = await enrich_batch(redis, [{"id": r.id, "text": r.text} for r in raw], category=category)
 
         enriched: list[EnrichedResult] = []
         for r in raw:
@@ -539,6 +547,13 @@ async def live_search(
                 entities=        nlp.get("entities", []),
                 summary=         nlp.get("summary", ""),
             ))
+
+        # Filter by category if requested (confidence >= 0.6)
+        if category:
+            enriched = [
+                r for r in enriched
+                if nlp_map.get(r.id, {}).get("category") == category and nlp_map.get(r.id, {}).get("category_confidence", 0) >= 0.6
+            ]
 
         # Aggregate summary
         pos = sum(1 for r in enriched if r.sentiment == "positive")
