@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { formatDistanceToNow, parseISO } from "date-fns";
+import { formatDistanceToNow, parseISO, subDays, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, ExternalLink, RefreshCw, Users, TrendingUp } from "lucide-react";
+import { Search, ExternalLink, RefreshCw, Users, TrendingUp, Calendar } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface EnrichedResult {
@@ -39,9 +39,26 @@ const SENT_BG: Record<string, string> = {
 
 const SOURCE_KEYS = ["twitter", "web", "bluesky", "media"] as const;
 
+const DATE_PRESETS = [
+  { label: "Todo", days: 0 },
+  { label: "7d",   days: 7 },
+  { label: "14d",  days: 14 },
+  { label: "30d",  days: 30 },
+  { label: "60d",  days: 60 },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const doSearch = (q: string, sources: string[]): Promise<SearchResponse> =>
   api.get("/search", { params: { q, sources: sources.join(",") } }).then(r => r.data);
+
+function filterByDays(results: EnrichedResult[], days: number): EnrichedResult[] {
+  if (!days) return results;
+  const cutoff = subDays(new Date(), days);
+  return results.filter(r => {
+    try { return isAfter(parseISO(r.published_at), cutoff); }
+    catch { return true; }
+  });
+}
 
 function SentimentBadge({ s }: { s: string }) {
   return (
@@ -129,11 +146,12 @@ function ResultCard({ r }: { r: EnrichedResult }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SearchPage() {
-  const [input,   setInput]   = useState("");
-  const [query,   setQuery]   = useState("");
-  const [sources, setSources] = useState<string[]>(["twitter", "web", "bluesky", "media"]);
-  const [tab,     setTab]     = useState<"all" | "twitter" | "web" | "bluesky" | "media">("all");
+  const [input,      setInput]      = useState("");
+  const [query,      setQuery]      = useState("");
+  const [sources,    setSources]    = useState<string[]>(["twitter", "web", "bluesky", "media"]);
+  const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "bluesky" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
+  const [dateDays,   setDateDays]   = useState(0);
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
     queryKey:  ["live-search", query, sources.join(",")],
@@ -147,6 +165,7 @@ export default function SearchPage() {
     const q = input.trim();
     if (!q) return;
     setSentFilter("");
+    setDateDays(0);
     setTab("all");
     setQuery(q);
   };
@@ -154,7 +173,7 @@ export default function SearchPage() {
   const toggleSrc = (k: string) =>
     setSources(p => p.includes(k) ? p.filter(s => s !== k) : [...p, k]);
 
-  const all = data?.results ?? [];
+  const all = filterByDays(data?.results ?? [], dateDays);
   const byPlatform = {
     twitter: all.filter(r => r.platform === "twitter"),
     web:     all.filter(r => r.platform === "web"),
@@ -165,7 +184,18 @@ export default function SearchPage() {
   const tabResults = tab === "all" ? all : byPlatform[tab] ?? [];
   const filtered   = sentFilter ? tabResults.filter(r => r.sentiment === sentFilter) : tabResults;
 
-  const s = data?.summary;
+  // Recalculate summary from filtered results
+  const pos = all.filter(r => r.sentiment === "positive").length;
+  const neg = all.filter(r => r.sentiment === "negative").length;
+  const s = data?.summary ? {
+    ...data.summary,
+    total:    all.length,
+    positive: pos,
+    negative: neg,
+    neutral:  all.length - pos - neg,
+    reach:      all.reduce((a, r) => a + r.followers, 0),
+    engagement: all.reduce((a, r) => a + r.likes + r.shares + r.comments, 0),
+  } : data?.summary;
   const sentPct = s && s.total > 0 ? Math.round(s.positive / s.total * 100) : 0;
   const negPct  = s && s.total > 0 ? Math.round(s.negative / s.total * 100) : 0;
 
@@ -196,7 +226,7 @@ export default function SearchPage() {
           </button>
         </div>
 
-        {/* Source chips */}
+        {/* Source chips + date filters row */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Fuentes:</span>
           {SOURCE_KEYS.map(k => (
@@ -218,6 +248,26 @@ export default function SearchPage() {
             </button>
           )}
         </div>
+
+        {/* Date range presets — visible only when results exist */}
+        {data && !isFetching && (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+            <Calendar size={13} color="var(--text-muted)" />
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Período:</span>
+            {DATE_PRESETS.map(({ label, days }) => (
+              <button key={days} onClick={() => setDateDays(days)}
+                className={dateDays === days ? "btn-primary" : "btn-ghost"}
+                style={{ padding: "3px 10px", fontSize: 12 }}>
+                {label}
+              </button>
+            ))}
+            {dateDays > 0 && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
+                · {all.length} resultado{all.length !== 1 ? "s" : ""} en los últimos {dateDays} días
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Loading */}
