@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from dotenv import load_dotenv
 
 from connectors.twitter import TwitterConnector
+from connectors.twitter_rapid import TwitterRapidConnector
 from connectors.youtube import YouTubeConnector
 from connectors.tiktok import TikTokConnector
 from connectors.scraper import WebScraperConnector
@@ -83,6 +84,10 @@ async def run():
             if "twitter" in sources and os.getenv("TWITTER_BEARER_TOKEN"):
                 running_tasks.append(asyncio.create_task(
                     TwitterConnector(producer, redis, pid, keywords).run()
+                ))
+            if "twitter" in sources and os.getenv("RAPIDAPI_KEY"):
+                running_tasks.append(asyncio.create_task(
+                    TwitterRapidConnector(producer, redis, pid, keywords).run()
                 ))
             if "youtube" in sources and os.getenv("YOUTUBE_API_KEY"):
                 running_tasks.append(asyncio.create_task(
