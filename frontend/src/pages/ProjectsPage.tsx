@@ -91,10 +91,7 @@ export default function ProjectsPage({ onSelect }: Props) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {projects.map((p: any) => (
-          <div key={p.id} className="card" style={{ cursor: "pointer", transition: "border-color .15s" }}
-            onClick={() => onSelect(p.id, p.name)}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#58a6ff")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}>
+          <div key={p.id} className="card card-hover" onClick={() => onSelect(p.id, p.name)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

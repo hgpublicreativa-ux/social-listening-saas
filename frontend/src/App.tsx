@@ -23,28 +23,33 @@ function Sidebar({ onNav, activeView }: { onNav: (v: string) => void; activeView
   const navigate = useNavigate();
   return (
     <aside className="app-sidebar">
-      <div style={{ marginBottom: 20, color: "#58a6ff" }}>
-        <Radio size={22} />
+      {/* Brand mark — gradient glow */}
+      <div style={{
+        width: 40, height: 40, marginBottom: 18,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        borderRadius: 12,
+        background: "var(--grad-brand)",
+        boxShadow: "0 4px 16px var(--accent-glow)",
+        color: "#fff",
+      }} title="Social Listening">
+        <Radio size={20} />
       </div>
       {NAV_ITEMS.map((item) => (
-        <button key={item.id} onClick={() => onNav(item.id)} title={item.label} style={{
-          width: 40, height: 40,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: activeView === item.id ? "rgba(88,166,255,.15)" : "transparent",
-          color: activeView === item.id ? "#58a6ff" : "var(--text-muted)",
-          border: "none", borderRadius: 8, cursor: "pointer",
-          transition: "background .15s, color .15s",
-        }}>
+        <button
+          key={item.id}
+          onClick={() => onNav(item.id)}
+          title={item.label}
+          className={`nav-btn${activeView === item.id ? " active" : ""}`}
+        >
           {item.icon}
         </button>
       ))}
       <div style={{ flex: 1 }} />
-      <button onClick={() => { localStorage.removeItem("token"); navigate("/login"); }} title="Cerrar sesión" style={{
-        width: 40, height: 40,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "transparent", color: "var(--text-muted)",
-        border: "none", borderRadius: 8, cursor: "pointer",
-      }}>
+      <button
+        onClick={() => { localStorage.removeItem("token"); navigate("/login"); }}
+        title="Cerrar sesión"
+        className="nav-btn"
+      >
         <LogOut size={18} />
       </button>
     </aside>
