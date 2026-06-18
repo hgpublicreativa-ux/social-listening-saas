@@ -13,14 +13,37 @@ from utils.normalizer import make_envelope
 
 log = logging.getLogger("ingestion.scraper")
 
-POLL_SECONDS = 900  # 15 minutes
+POLL_SECONDS = 600  # 10 minutes
 
 RSS_FEEDS = [
+    # Noticias internacionales
     "https://feeds.bbci.co.uk/mundo/rss.xml",
-    "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml",
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+    "https://feeds.reuters.com/reuters/topNews",
+    "https://www.theguardian.com/world/rss",
+    # Latinoamérica / Ecuador / política
+    "https://www.elcomercio.com/feed",
+    "https://www.extra.ec/feed",
+    "https://www.primicias.ec/feed/",
+    "https://www.infobae.com/feeds/rss/",
+    "https://www.clarin.com/rss/mundo/",
+    "https://www.larepublica.ec/feed/",
+    "https://www.telegrafo.com.ec/feed/",
+    # Deportes
+    "https://www.espn.com/espn/rss/news",
+    "https://www.marca.com/rss/portada.xml",
+    "https://e.rpp-noticias.io/rss",
+    # Tecnología
+    "https://techcrunch.com/feed/",
+    "https://www.theverge.com/rss/index.xml",
+    # Entretenimiento / música
     "https://www.billboard.com/feed/",
     "https://rollingstone.com/music/feed/",
-    "https://www.eluniversal.com.mx/rss.xml",
+    # Negocios / economía
+    "https://feeds.bloomberg.com/economics/news.rss",
+    "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
 ]
 
 
