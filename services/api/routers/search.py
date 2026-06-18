@@ -387,7 +387,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             if r.status_code != 200:
                 return []
             feed = feedparser.parse(r.content)
-            return _parse_entries(feed.entries, domain, limit=20)
+            return _parse_entries(feed.entries, domain, limit=30)
         except Exception as exc:
             log.debug("Site RSS error [%s]: %s", domain, exc)
             return []
@@ -402,7 +402,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                 timeout=12,
             )
             feed = feedparser.parse(r.content)
-            return _parse_entries(feed.entries, domain, limit=15)
+            return _parse_entries(feed.entries, domain, limit=20)
         except Exception as exc:
             log.debug("GNews site error [%s]: %s", domain, exc)
             return []
@@ -422,7 +422,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
     results = [r for batch in batches for r in batch]
     results.sort(key=lambda r: r.published_at, reverse=True)
-    return results[:40]
+    return results[:60]
 
 
 async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
@@ -430,7 +430,7 @@ async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
         r = await client.get(
             "https://www.reddit.com/search.rss",
-            params={"q": q, "sort": "new", "t": "month", "limit": 40},
+            params={"q": q, "sort": "new", "t": "month", "limit": 60},
             headers={"User-Agent": "SocialMonitor/1.0 (compatible; news aggregator)"},
             timeout=12,
         )
@@ -493,9 +493,9 @@ async def live_search(
             if "twitter" in src_list:
                 tasks.append(_fetch_twitter(client, q))
             if "web" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="web", worldwide=True, limit=40))
+                tasks.append(_fetch_gnews(client, q, platform="web", worldwide=True, limit=60))
             if "gnews_ec" in src_list:
-                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True, limit=40))
+                tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True, limit=60))
             if "reddit" in src_list:
                 tasks.append(_fetch_reddit(client, q))
             if "media" in src_list:

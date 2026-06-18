@@ -28,21 +28,38 @@ interface SearchResponse {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", reddit: "🟠", media: "📺", gnews_ec: "🇪🇨" };
 const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", reddit: "#ff4500", media: "#e3a000", gnews_ec: "#34a853" };
-const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", reddit: "Reddit", media: "Medios EC", gnews_ec: "Google News EC" };
+const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", reddit: "Reddit", media: "Medios monitoreados", gnews_ec: "Noticias Ecuador" };
 
 const SENT_COLOR: Record<string, string> = { positive: "#3fb950", negative: "#f85149", neutral: "#8b949e" };
 const SENT_BG: Record<string, string>    = { positive: "rgba(63,185,80,.15)", negative: "rgba(248,81,73,.15)", neutral: "rgba(139,148,158,.12)" };
 const SENT_LABEL: Record<string, string> = { positive: "Positivo", negative: "Negativo", neutral: "Neutral" };
 const SENT_EMOJI: Record<string, string> = { positive: "😊", negative: "😠", neutral: "😐" };
 
-const SOURCE_KEYS = ["twitter", "web", "gnews_ec", "reddit", "media"] as const;
+const SOURCE_KEYS = ["twitter", "web", "reddit", "gnews_ec", "media"] as const;
 const DATE_PRESETS = [{ label: "7d", days: 7 }, { label: "14d", days: 14 }, { label: "30d", days: 30 }, { label: "60d", days: 60 }];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const doSearch = (q: string, sources: string[]): Promise<SearchResponse> =>
   api.get("/search", { params: { q, sources: sources.join(",") } }).then(r => r.data);
 
-function filterByDays(results: EnrichedResult[], days: number): EnrichedResult[] {
+function filterByRange(
+  results: EnrichedResult[],
+  days: number,
+  dateFrom: string,
+  dateTo: string,
+): EnrichedResult[] {
+  if (dateFrom || dateTo) {
+    const fromD = dateFrom ? new Date(dateFrom) : null;
+    const toD   = dateTo   ? new Date(dateTo + "T23:59:59") : null;
+    return results.filter(r => {
+      try {
+        const d = parseISO(r.published_at);
+        if (fromD && d < fromD) return false;
+        if (toD   && d > toD)   return false;
+        return true;
+      } catch { return true; }
+    });
+  }
   if (!days) return results;
   const cutoff = subDays(new Date(), days);
   return results.filter(r => {
@@ -213,14 +230,6 @@ function ResultCard({ r }: { r: EnrichedResult }) {
         </p>
       ) : null}
 
-      {/* Sentiment score bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.keywords?.length ? 10 : 0 }}>
-        <span style={{ fontSize: 10, color: "var(--text-muted)", minWidth: 70, fontWeight: 600 }}>Confianza IA</span>
-        <div style={{ flex: 1, height: 4, background: "var(--bg)", borderRadius: 4, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${scoreBar}%`, background: SENT_COLOR[r.sentiment] || "#8b949e", borderRadius: 4, transition: "width .5s" }} />
-        </div>
-        <span style={{ fontSize: 10, color: "var(--text-muted)", minWidth: 28, textAlign: "right" }}>{scoreBar}%</span>
-      </div>
 
       {/* Keywords */}
       {r.keywords?.length > 0 && (
@@ -254,6 +263,8 @@ export default function SearchPage() {
   const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "reddit" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
   const [dateDays,   setDateDays]   = useState(60);
+  const [dateFrom,   setDateFrom]   = useState("");
+  const [dateTo,     setDateTo]     = useState("");
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
     queryKey:  ["live-search", query, sources.join(",")],
@@ -268,6 +279,8 @@ export default function SearchPage() {
     if (!q) return;
     setSentFilter("");
     setDateDays(60);
+    setDateFrom("");
+    setDateTo("");
     setTab("all");
     setQuery(q);
   };
@@ -275,7 +288,7 @@ export default function SearchPage() {
   const toggleSrc = (k: string) =>
     setSources(p => p.includes(k) ? p.filter(s => s !== k) : [...p, k]);
 
-  const all = filterByDays(data?.results ?? [], dateDays);
+  const all = filterByRange(data?.results ?? [], dateDays, dateFrom, dateTo);
   const byPlatform = {
     twitter:  all.filter(r => r.platform === "twitter"),
     web:      all.filter(r => r.platform === "web"),
@@ -353,21 +366,60 @@ export default function SearchPage() {
           )}
         </div>
 
-        {/* Date presets */}
+        {/* Date presets + custom range */}
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <Calendar size={13} color="var(--text-muted)" />
           <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Período:</span>
           {DATE_PRESETS.map(({ label, days }) => (
-            <button key={days} onClick={() => setDateDays(days)}
+            <button key={days}
+              onClick={() => { setDateDays(days); setDateFrom(""); setDateTo(""); }}
               disabled={!data}
-              className={dateDays === days ? "btn-primary" : "btn-ghost"}
+              className={dateDays === days && !dateFrom && !dateTo ? "btn-primary" : "btn-ghost"}
               style={{ padding: "3px 12px", fontSize: 12, opacity: !data ? 0.4 : 1, fontWeight: 600 }}>
               {label}
             </button>
           ))}
-          {data && dateDays > 0 && (
+
+          {/* Divider */}
+          <span style={{ color: "var(--border-strong)", fontSize: 14, margin: "0 2px" }}>|</span>
+
+          {/* Custom date range */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="date"
+              value={dateFrom}
+              disabled={!data}
+              onChange={e => { setDateFrom(e.target.value); setDateDays(0); }}
+              style={{
+                fontSize: 11, padding: "3px 8px", background: "var(--surface-2)",
+                border: `1px solid ${dateFrom ? "var(--accent)" : "var(--border)"}`,
+                borderRadius: 8, color: "var(--text)", cursor: "pointer",
+                opacity: !data ? 0.4 : 1,
+              }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>→</span>
+            <input
+              type="date"
+              value={dateTo}
+              disabled={!data}
+              onChange={e => { setDateTo(e.target.value); setDateDays(0); }}
+              style={{
+                fontSize: 11, padding: "3px 8px", background: "var(--surface-2)",
+                border: `1px solid ${dateTo ? "var(--accent)" : "var(--border)"}`,
+                borderRadius: 8, color: "var(--text)", cursor: "pointer",
+                opacity: !data ? 0.4 : 1,
+              }}
+            />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); setDateDays(60); }}
+                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, padding: "0 2px" }}
+                title="Limpiar rango">✕</button>
+            )}
+          </div>
+
+          {data && (
             <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
-              · <strong style={{ color: "var(--text)" }}>{all.length}</strong> resultado{all.length !== 1 ? "s" : ""} en los últimos {dateDays} días
+              · <strong style={{ color: "var(--text)" }}>{all.length}</strong> resultado{all.length !== 1 ? "s" : ""}
             </span>
           )}
         </div>
@@ -451,12 +503,12 @@ export default function SearchPage() {
               {/* Platform tabs */}
               <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "1px solid var(--border)", paddingBottom: 0, overflowX: "auto" }}>
                 {[
-                  { key: "all",      label: `Todos`, count: all.length },
-                  { key: "twitter",  label: `𝕏 Twitter`,       count: byPlatform.twitter.length },
-                  { key: "web",      label: `📰 Google News`,   count: byPlatform.web.length },
-                  { key: "gnews_ec", label: `🇪🇨 EC`,           count: byPlatform.gnews_ec.length },
-                  { key: "reddit",   label: `🟠 Reddit`,        count: byPlatform.reddit.length },
-                  { key: "media",    label: `📺 Medios`,        count: byPlatform.media.length },
+                  { key: "all",      label: `Todos`,                      count: all.length },
+                  { key: "twitter",  label: `𝕏 Twitter`,                  count: byPlatform.twitter.length },
+                  { key: "web",      label: `📰 Google News`,              count: byPlatform.web.length },
+                  { key: "reddit",   label: `🟠 Reddit`,                   count: byPlatform.reddit.length },
+                  { key: "gnews_ec", label: `🇪🇨 Noticias Ecuador`,        count: byPlatform.gnews_ec.length },
+                  { key: "media",    label: `📺 Medios monitoreados`,      count: byPlatform.media.length },
                 ].map(({ key, label, count }) => (
                   <button key={key} onClick={() => setTab(key as any)} style={{
                     background:   "transparent",
