@@ -338,6 +338,12 @@ SITE_SEARCH_RSS: dict[str, str] = {
     "wqradio.com":       "https://wqradio.com/?s={q}&feed=rss2",
 }
 
+# Static section feeds (no query param) — fetched always, filtered locally by _matches_query
+# Format: (domain_label, rss_url)
+STATIC_SECTION_FEEDS: list[tuple[str, str]] = [
+    ("extra.ec",  "https://www.extra.ec/farandula/feed/"),
+]
+
 HEADERS_MEDIA = {
     "User-Agent": "Mozilla/5.0 (compatible; SocialMonitor/1.0; +https://socialmonitor.app)",
     "Accept": "application/rss+xml, application/xml, text/xml, */*",
@@ -433,8 +439,27 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             )
         return site_results + gnews_results
 
+    async def _fetch_static_section(domain: str, url: str) -> list[RawResult]:
+        """Fetch a static section RSS feed (no query param), filter locally."""
+        try:
+            r = await client.get(url, headers=HEADERS_MEDIA, timeout=12)
+            if r.status_code != 200:
+                return []
+            feed = feedparser.parse(r.content)
+            raw = _parse_entries(feed.entries, domain, limit=30)
+            return [item for item in raw if _matches_query(item.text, q)]
+        except Exception as exc:
+            log.debug("Static section RSS error [%s]: %s", domain, exc)
+            return []
+
     batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
     results = [r for batch in batches for r in batch]
+
+    # Static section feeds (filtered locally)
+    section_batches = await asyncio.gather(*[_fetch_static_section(d, u) for d, u in STATIC_SECTION_FEEDS])
+    for batch in section_batches:
+        results.extend(batch)
+
     results.sort(key=lambda r: r.published_at, reverse=True)
     return results[:60]
 
