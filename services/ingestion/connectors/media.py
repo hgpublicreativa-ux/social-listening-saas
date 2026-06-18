@@ -54,6 +54,12 @@ class MediaConnector:
         self.keywords   = keywords
         self.domains    = get_domains()
 
+    @staticmethod
+    def _matches(text: str, keyword: str) -> bool:
+        tokens = [t.strip().lower() for t in keyword.replace('"', '').split() if len(t.strip()) > 2]
+        haystack = text.lower()
+        return any(tok in haystack for tok in tokens)
+
     async def _fetch(self, client: httpx.AsyncClient, keyword: str, domain: str) -> list[dict]:
         params = {
             "q":    f"{keyword} site:{domain}",
@@ -65,7 +71,12 @@ class MediaConnector:
             r = await client.get(GNEWS_URL, params=params, timeout=15)
             r.raise_for_status()
             feed = feedparser.parse(r.text)
-            return feed.entries
+            filtered = []
+            for e in feed.entries:
+                text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
+                if self._matches(text, keyword):
+                    filtered.append(e)
+            return filtered
         except Exception as exc:
             log.warning("Media fetch error [%s / %s]: %s", domain, keyword, exc)
             return []

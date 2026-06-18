@@ -199,6 +199,13 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
         return []
 
 
+def _matches_query(text: str, q: str) -> bool:
+    """Returns True if any keyword token from q appears in text (case-insensitive)."""
+    tokens = [t.strip().lower() for t in q.replace('"', '').split() if len(t.strip()) > 2]
+    haystack = text.lower()
+    return any(tok in haystack for tok in tokens)
+
+
 async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     """Searches all Ecuadorian media domains via Google News site: operator in parallel."""
     async def _one(domain: str) -> list[RawResult]:
@@ -211,7 +218,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             )
             feed = feedparser.parse(r.text)
             out  = []
-            for e in feed.entries[:10]:
+            for e in feed.entries[:15]:
                 try:
                     pub = (
                         datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
@@ -219,6 +226,9 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                         else datetime.now(timezone.utc).isoformat()
                     )
                     text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
+                    # Post-filter: ensure article actually contains the keyword
+                    if not _matches_query(text, q):
+                        continue
                     out.append(RawResult(
                         id=e.get("id") or e.get("link") or str(uuid.uuid4()),
                         platform="media",
