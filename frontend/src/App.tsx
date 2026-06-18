@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { LayoutDashboard, FolderKanban, Bell, Settings, LogOut, Radio } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Search, LogOut, Radio } from "lucide-react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProjectsPage from "./pages/ProjectsPage";
 import Dashboard from "./components/Dashboard";
+import SearchPage from "./pages/SearchPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("token");
@@ -15,7 +16,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function Sidebar({ onNav, activeView }: { onNav: (v: string) => void; activeView: string }) {
   const navigate = useNavigate();
   const navItems = [
-    { id: "projects", icon: <FolderKanban size={18} />, label: "Proyectos" },
+    { id: "search",    icon: <Search size={18} />,          label: "Búsqueda en vivo" },
+    { id: "projects",  icon: <FolderKanban size={18} />,    label: "Proyectos" },
     { id: "dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
   ];
 
@@ -64,6 +66,7 @@ function AppShell() {
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <Sidebar onNav={setView} activeView={view} />
       <main style={{ flex: 1, overflowY: "auto" }}>
+        {view === "search"   && <SearchPage />}
         {view === "projects" && <ProjectsPage onSelect={handleSelectProject} />}
         {view === "dashboard" && projectId
           ? <Dashboard projectId={projectId} projectName={projectName} />

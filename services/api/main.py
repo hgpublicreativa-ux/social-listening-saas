@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from redis.asyncio import Redis
 
-from routers import auth, projects, mentions, metrics, alerts
+from routers import auth, projects, mentions, metrics, alerts, search
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +68,7 @@ app.include_router(projects.router)
 app.include_router(mentions.router)
 app.include_router(metrics.router)
 app.include_router(alerts.router)
+app.include_router(search.router)
 
 
 @app.get("/health")

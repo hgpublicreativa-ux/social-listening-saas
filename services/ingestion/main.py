@@ -85,10 +85,7 @@ async def run():
                 running_tasks.append(asyncio.create_task(
                     TwitterConnector(producer, redis, pid, keywords).run()
                 ))
-            if "twitter" in sources and os.getenv("RAPIDAPI_KEY"):
-                running_tasks.append(asyncio.create_task(
-                    TwitterRapidConnector(producer, redis, pid, keywords).run()
-                ))
+            # TwitterRapidConnector removed from background — now on-demand via /search API
             if "youtube" in sources and os.getenv("YOUTUBE_API_KEY"):
                 running_tasks.append(asyncio.create_task(
                     YouTubeConnector(producer, redis, pid, keywords).run()
