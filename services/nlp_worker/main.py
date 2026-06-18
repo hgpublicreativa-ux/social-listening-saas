@@ -6,6 +6,7 @@ import uuid
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from redis.asyncio import Redis
+from kafka import kafka_config
 from elasticsearch import AsyncElasticsearch
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -109,16 +110,19 @@ async def run():
     redis    = Redis.from_url(REDIS_URL, decode_responses=True)
     es       = AsyncElasticsearch([ES_URL])
 
+    kc = kafka_config()
     consumer = AIOKafkaConsumer(
         "raw-mentions",
         bootstrap_servers=KAFKA_BOOTSTRAP,
         group_id="nlp-workers",
         value_deserializer=lambda v: json.loads(v.decode()),
         auto_offset_reset="latest",
+        **kc,
     )
     producer = AIOKafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP,
         value_serializer=lambda v: json.dumps(v).encode(),
+        **kc,
     )
 
     await consumer.start()

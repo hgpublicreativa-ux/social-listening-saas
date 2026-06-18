@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 import httpx
 from aiokafka import AIOKafkaConsumer
+from kafka import kafka_config
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -101,6 +102,7 @@ async def run():
         group_id="alert-engine",
         value_deserializer=lambda v: json.loads(v.decode()),
         auto_offset_reset="latest",
+        **kafka_config(),
     )
     await consumer.start()
     log.info("Alert engine started")

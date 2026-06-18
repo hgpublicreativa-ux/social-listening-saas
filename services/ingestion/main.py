@@ -13,6 +13,7 @@ from connectors.twitter import TwitterConnector
 from connectors.youtube import YouTubeConnector
 from connectors.tiktok import TikTokConnector
 from connectors.scraper import WebScraperConnector
+from utils.kafka import kafka_config
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -50,6 +51,7 @@ async def run():
         value_serializer=lambda v: json.dumps(v).encode(),
         compression_type="gzip",
         acks="all",
+        **kafka_config(),
     )
     await producer.start()
     log.info("Kafka producer connected to %s", KAFKA_BOOTSTRAP)

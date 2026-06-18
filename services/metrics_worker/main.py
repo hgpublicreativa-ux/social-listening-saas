@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 
 from aiokafka import AIOKafkaConsumer
+from kafka import kafka_config
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
@@ -106,6 +107,7 @@ async def run():
         group_id="metrics-workers",
         value_deserializer=lambda v: json.loads(v.decode()),
         auto_offset_reset="latest",
+        **kafka_config(),
     )
     await consumer.start()
     log.info("Metrics worker started, consuming enriched-mentions")
