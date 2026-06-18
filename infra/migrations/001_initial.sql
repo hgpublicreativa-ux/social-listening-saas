@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS organizations (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name        TEXT NOT NULL,
     plan        TEXT NOT NULL DEFAULT 'free',
-    api_key     TEXT UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+    api_key     TEXT UNIQUE DEFAULT md5(random()::text || clock_timestamp()::text),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
