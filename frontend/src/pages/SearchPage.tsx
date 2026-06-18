@@ -110,7 +110,7 @@ function ResultCard({ r }: { r: EnrichedResult }) {
       </div>
 
       {/* Title for news */}
-      {r.title && r.platform === "web" && r.title !== r.author && (
+      {r.title && ["web", "gnews_ec", "media"].includes(r.platform) && r.title !== r.author && (
         <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: "var(--text)", lineHeight: 1.4 }}>{r.title}</p>
       )}
 
