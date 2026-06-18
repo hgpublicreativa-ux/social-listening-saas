@@ -13,6 +13,8 @@ from connectors.tiktok import TikTokConnector
 from connectors.scraper import WebScraperConnector
 from connectors.reddit import RedditConnector
 from connectors.facebook import FacebookConnector
+from connectors.gnews import GoogleNewsConnector
+from connectors.bluesky import BlueskyConnector
 from streams import StreamProducer
 
 load_dotenv()
@@ -93,6 +95,12 @@ async def run():
             if "web" in sources:
                 running_tasks.append(asyncio.create_task(
                     WebScraperConnector(producer, redis, pid, keywords).run()
+                ))
+                running_tasks.append(asyncio.create_task(
+                    GoogleNewsConnector(producer, redis, pid, keywords).run()
+                ))
+                running_tasks.append(asyncio.create_task(
+                    BlueskyConnector(producer, redis, pid, keywords).run()
                 ))
             if ("reddit" in sources or "web" in sources) and os.getenv("REDDIT_CLIENT_ID"):
                 running_tasks.append(asyncio.create_task(

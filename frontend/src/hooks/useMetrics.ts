@@ -4,9 +4,7 @@ import { getTimeseries, getMetricsSummary, getTopCreators } from "../api/client"
 
 const fmt = (d: Date) => format(d, "yyyy-MM-dd");
 
-export function useTimeseries(projectId: string, days = 7, granularity = "hour") {
-  const to   = fmt(new Date());
-  const from = fmt(subDays(new Date(), days));
+export function useTimeseries(projectId: string, from: string, to: string, granularity = "hour") {
   return useQuery({
     queryKey: ["timeseries", projectId, from, to, granularity],
     queryFn:  () => getTimeseries(projectId, from, to, granularity),
@@ -14,9 +12,7 @@ export function useTimeseries(projectId: string, days = 7, granularity = "hour")
   });
 }
 
-export function useSummary(projectId: string, days = 7) {
-  const to   = fmt(new Date());
-  const from = fmt(subDays(new Date(), days));
+export function useSummary(projectId: string, from: string, to: string) {
   return useQuery({
     queryKey: ["summary", projectId, from, to],
     queryFn:  () => getMetricsSummary(projectId, from, to),
@@ -31,3 +27,8 @@ export function useTopCreators(projectId: string) {
     enabled:  !!projectId,
   });
 }
+
+export const defaultRange = (days: number) => ({
+  from: fmt(subDays(new Date(), days)),
+  to:   fmt(new Date()),
+});
