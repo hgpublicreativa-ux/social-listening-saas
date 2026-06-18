@@ -287,30 +287,35 @@ async def _fetch_gnews(
         return []
 
 
+def _normalize(s: str) -> str:
+    """Strip accents/diacritics for accent-insensitive matching."""
+    import unicodedata
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("ascii").lower()
+
+
 def _matches_query(text: str, q: str) -> bool:
     """
     Returns True if the article text is relevant to the query.
     - Quoted phrase: exact phrase match required.
     - Multi/single word: at least ONE significant token (≥4 chars) must appear.
-    Only evaluates title + summary text passed in, never metadata.
+    Accent-insensitive: "futbol" matches "fútbol", etc.
     """
     import re
-    haystack = text.lower()
+    haystack = _normalize(text)
     q_clean = q.strip()
 
     # Exact phrase for quoted terms
     phrases = re.findall(r'"([^"]+)"', q_clean)
     for phrase in phrases:
-        if phrase.lower() not in haystack:
+        if _normalize(phrase) not in haystack:
             return False
     if phrases:
         return True
 
     # Any significant token must appear (OR, min 4 chars to skip stop words)
-    tokens = [t.strip().lower() for t in re.sub(r'"[^"]*"', '', q_clean).split() if len(t.strip()) >= 4]
+    tokens = [_normalize(t.strip()) for t in re.sub(r'"[^"]*"', '', q_clean).split() if len(t.strip()) >= 4]
     if not tokens:
-        # fallback: any token ≥2 chars
-        tokens = [t.strip().lower() for t in q_clean.split() if len(t.strip()) >= 2]
+        tokens = [_normalize(t.strip()) for t in q_clean.split() if len(t.strip()) >= 2]
     return any(tok in haystack for tok in tokens)
 
 
