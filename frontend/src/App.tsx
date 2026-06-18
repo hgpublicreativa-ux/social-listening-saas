@@ -23,17 +23,23 @@ function Sidebar({ onNav, activeView }: { onNav: (v: string) => void; activeView
   const navigate = useNavigate();
   return (
     <aside className="app-sidebar">
-      {/* Brand mark — gradient glow */}
-      <div style={{
+      {/* Brand mark — clickable home button */}
+      <button onClick={() => onNav("search")} style={{
         width: 40, height: 40, marginBottom: 18,
         display: "flex", alignItems: "center", justifyContent: "center",
         borderRadius: 12,
         background: "var(--grad-brand)",
         boxShadow: "0 4px 16px var(--accent-glow)",
         color: "#fff",
-      }} title="Social Listening">
+        border: "none",
+        cursor: "pointer",
+        transition: "transform .2s",
+      }}
+      onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+      onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      title="Volver al inicio">
         <Radio size={20} />
-      </div>
+      </button>
       {NAV_ITEMS.map((item) => (
         <button
           key={item.id}
