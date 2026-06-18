@@ -14,70 +14,76 @@ log = logging.getLogger("ingestion.twitter_rapid")
 
 RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY", "")
 RAPIDAPI_HOST = "twittr-v2-fastest-twitter-x-api-150k-requests-for-15.p.rapidapi.com"
-SEARCH_URL    = f"https://{RAPIDAPI_HOST}/search-tweets"
+SEARCH_URL    = f"https://{RAPIDAPI_HOST}/search"
 POLL_SECONDS  = 900  # 15 min
 
 
-def _extract_tweets(raw: dict) -> list[dict]:
-    """Parse Twitter internal GraphQL response from twttrapi."""
-    tweets = []
+def _parse_entry(entry: dict) -> dict | None:
+    """Extract tweet data from a single timeline entry."""
     try:
-        instructions = (
-            raw.get("data", {})
-               .get("search_by_raw_query", {})
-               .get("search_timeline", {})
-               .get("timeline", {})
-               .get("instructions", [])
+        result = (
+            entry.get("content", {})
+                 .get("itemContent", {})
+                 .get("tweet_results", {})
+                 .get("result", {})
         )
-        for instr in instructions:
-            entries = instr.get("entries", [])
-            for entry in entries:
-                try:
-                    result = (
-                        entry.get("content", {})
-                             .get("itemContent", {})
-                             .get("tweet_results", {})
-                             .get("result", {})
-                    )
-                    if not result:
-                        continue
-                    # Handle tweet wrappers
-                    if result.get("__typename") == "TweetWithVisibilityResults":
-                        result = result.get("tweet", {})
+        if not result:
+            return None
+        if result.get("__typename") == "TweetWithVisibilityResults":
+            result = result.get("tweet", {})
 
-                    legacy = result.get("legacy", {})
-                    text   = legacy.get("full_text") or legacy.get("text", "")
-                    if not text:
-                        continue
+        legacy = result.get("legacy", {})
+        text   = legacy.get("full_text") or legacy.get("text", "")
+        if not text:
+            return None
 
-                    user_legacy = (
-                        result.get("core", {})
-                              .get("user_results", {})
-                              .get("result", {})
-                              .get("legacy", {})
-                    )
+        user_legacy = (
+            result.get("core", {})
+                  .get("user_results", {})
+                  .get("result", {})
+                  .get("legacy", {})
+        )
 
-                    tweets.append({
-                        "id":          legacy.get("id_str") or result.get("rest_id", ""),
-                        "text":        text,
-                        "created_at":  legacy.get("created_at", ""),
-                        "likes":       int(legacy.get("favorite_count", 0) or 0),
-                        "retweets":    int(legacy.get("retweet_count", 0) or 0),
-                        "replies":     int(legacy.get("reply_count", 0) or 0),
-                        "screen_name": user_legacy.get("screen_name", ""),
-                        "name":        user_legacy.get("name", ""),
-                        "followers":   int(user_legacy.get("followers_count", 0) or 0),
-                        "user_id":     user_legacy.get("id_str", ""),
-                    })
-                except Exception:
-                    continue
-    except Exception as exc:
-        log.warning("Tweet parse error: %s", exc)
+        return {
+            "id":          legacy.get("id_str") or result.get("rest_id", ""),
+            "text":        text,
+            "created_at":  legacy.get("created_at", ""),
+            "likes":       int(legacy.get("favorite_count", 0) or 0),
+            "retweets":    int(legacy.get("retweet_count", 0) or 0),
+            "replies":     int(legacy.get("reply_count", 0) or 0),
+            "screen_name": user_legacy.get("screen_name", ""),
+            "name":        user_legacy.get("name", ""),
+            "followers":   int(user_legacy.get("followers_count", 0) or 0),
+            "user_id":     user_legacy.get("id_str", ""),
+        }
+    except Exception:
+        return None
+
+
+def _extract_tweets(raw: dict) -> list[dict]:
+    """
+    Parse response from twittr-v2-fastest (kiddodev).
+    Top-level: {"category": "Top", "entries": [{"entries": [...tweet entries...]}]}
+    """
+    tweets = []
+    top_entries = raw.get("entries", [])
+    for group in top_entries:
+        # Each group has sub-entries (the actual tweets)
+        sub_entries = group.get("entries", [])
+        if sub_entries:
+            for entry in sub_entries:
+                tw = _parse_entry(entry)
+                if tw:
+                    tweets.append(tw)
+        else:
+            # Some entries are direct tweet entries (not grouped)
+            tw = _parse_entry(group)
+            if tw:
+                tweets.append(tw)
     return tweets
 
 
 def _parse_twitter_date(date_str: str) -> str:
-    """Parse Twitter date format: 'Thu Jun 18 10:00:00 +0000 2026'"""
     try:
         dt = datetime.strptime(date_str, "%a %b %d %H:%M:%S +0000 %Y")
         return dt.replace(tzinfo=timezone.utc).isoformat()
@@ -87,8 +93,8 @@ def _parse_twitter_date(date_str: str) -> str:
 
 class TwitterRapidConnector:
     """
-    Twitter search via RapidAPI twttrapi — no official Twitter API account needed.
-    Requires RAPIDAPI_KEY env var (free tier: 500 req/month on twttrapi.p.rapidapi.com).
+    Twitter search via RapidAPI twittr-v2-fastest (kiddodev).
+    Requires RAPIDAPI_KEY env var.
     """
 
     def __init__(self, producer: StreamProducer, redis: Redis, project_id: str, keywords: list[str]):
@@ -104,10 +110,10 @@ class TwitterRapidConnector:
             timeout=30,
         )
         if r.status_code in (401, 403):
-            log.error("RapidAPI Twitter auth failed (HTTP %d) — check RAPIDAPI_KEY", r.status_code)
+            log.error("RapidAPI Twitter auth failed (HTTP %d) — check RAPIDAPI_KEY subscription", r.status_code)
             raise httpx.HTTPStatusError("auth", request=r.request, response=r)
         if r.status_code == 429:
-            log.warning("RapidAPI Twitter rate limited — backing off")
+            log.warning("RapidAPI Twitter rate limited — backing off 60s")
             await asyncio.sleep(60)
             return []
         r.raise_for_status()
@@ -134,7 +140,6 @@ class TwitterRapidConnector:
                             text = tw["text"]
                             if not tid or not text.strip():
                                 continue
-                            # Skip retweets to avoid duplicates
                             if text.startswith("RT @"):
                                 continue
                             if await is_duplicate(self.redis, "twitter", tid):
