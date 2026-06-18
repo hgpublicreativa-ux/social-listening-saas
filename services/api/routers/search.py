@@ -26,7 +26,7 @@ RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY", "")
 RAPIDAPI_HOST = "twittr-v2-fastest-twitter-x-api-150k-requests-for-15.p.rapidapi.com"
 TWITTER_URL   = f"https://{RAPIDAPI_HOST}/search"
 GNEWS_URL     = "https://news.google.com/rss/search"
-BLUESKY_URL   = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
+
 
 MEDIA_DOMAINS = [
     "ecuavisa.com",
@@ -380,46 +380,52 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     return results[:40]
 
 
-async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
+async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
+    """Fetches Reddit posts via public RSS search — no auth needed."""
     try:
-        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 40}, timeout=10)
+        r = await client.get(
+            "https://www.reddit.com/search.rss",
+            params={"q": q, "sort": "new", "t": "month", "limit": 40},
+            headers={"User-Agent": "SocialMonitor/1.0 (compatible; news aggregator)"},
+            timeout=12,
+        )
         if r.status_code != 200:
             return []
+        feed = feedparser.parse(r.content)
         results = []
-        for post in r.json().get("posts", []):
+        import re as _re
+        for e in feed.entries[:40]:
             try:
-                record = post.get("record", {})
-                text   = record.get("text", "")
-                if not text:
-                    continue
-                author = post.get("author", {})
-                handle = author.get("handle", "")
-                uri    = post.get("uri", "")
-                created = record.get("createdAt", "")
-                try:
-                    pub = datetime.fromisoformat(created.replace("Z", "+00:00")).isoformat()
-                except Exception:
-                    pub = datetime.now(timezone.utc).isoformat()
+                pub = (
+                    datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+                    if e.get("published_parsed")
+                    else datetime.now(timezone.utc).isoformat()
+                )
+                title   = e.get("title", "")
+                summary = _re.sub(r"<[^>]+>", " ", e.get("summary", "")).strip()
+                text    = f"{title} {summary}".strip()
+                author  = e.get("author", "").replace("/u/", "").strip()
+                url     = e.get("link", "")
+                subreddit = ""
+                if "/r/" in url:
+                    subreddit = url.split("/r/")[1].split("/")[0]
                 results.append(RawResult(
-                    id=uri or str(uuid.uuid4()),
-                    platform="bluesky",
+                    id=e.get("id") or url or str(uuid.uuid4()),
+                    platform="reddit",
                     text=text[:1000],
-                    title=f"@{handle}",
-                    url=f"https://bsky.app/profile/{handle}/post/{uri.split('/')[-1]}",
-                    author=author.get("displayName") or handle,
-                    author_id=handle,
+                    title=title,
+                    url=url,
+                    author=f"u/{author}" if author else "Reddit",
+                    author_id=author,
                     followers=0,
                     published_at=pub,
-                    likes=int(post.get("likeCount", 0) or 0),
-                    shares=int(post.get("repostCount", 0) or 0),
-                    comments=int(post.get("replyCount", 0) or 0),
-                    source="bsky.app",
+                    source=f"r/{subreddit}" if subreddit else "reddit.com",
                 ))
             except Exception:
                 continue
         return results
     except Exception as exc:
-        log.warning("Bluesky fetch error: %s", exc)
+        log.warning("Reddit fetch error: %s", exc)
         return []
 
 
@@ -443,8 +449,8 @@ async def live_search(
                 tasks.append(_fetch_gnews(client, q, platform="web", worldwide=True, limit=40))
             if "gnews_ec" in src_list:
                 tasks.append(_fetch_gnews(client, q, platform="gnews_ec", ec_only=True, limit=40))
-            if "bluesky" in src_list:
-                tasks.append(_fetch_bluesky(client, q))
+            if "reddit" in src_list:
+                tasks.append(_fetch_reddit(client, q))
             if "media" in src_list:
                 tasks.append(_fetch_media(client, q))
             fetched_batches = await asyncio.gather(*tasks)

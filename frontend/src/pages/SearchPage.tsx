@@ -26,9 +26,9 @@ interface SearchResponse {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", bluesky: "☁", media: "📺", gnews_ec: "🇪🇨" };
-const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", bluesky: "#0085ff", media: "#e3a000", gnews_ec: "#34a853" };
-const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", bluesky: "Bluesky", media: "Medios EC", gnews_ec: "Google News EC" };
+const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", reddit: "🟠", media: "📺", gnews_ec: "🇪🇨" };
+const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", reddit: "#ff4500", media: "#e3a000", gnews_ec: "#34a853" };
+const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", reddit: "Reddit", media: "Medios EC", gnews_ec: "Google News EC" };
 
 const SENT_COLOR: Record<string, string> = {
   positive: "#3fb950", negative: "#f85149", neutral: "#8b949e",
@@ -37,7 +37,7 @@ const SENT_BG: Record<string, string> = {
   positive: "rgba(63,185,80,.15)", negative: "rgba(248,81,73,.15)", neutral: "rgba(139,148,158,.12)",
 };
 
-const SOURCE_KEYS = ["twitter", "web", "gnews_ec", "bluesky", "media"] as const;
+const SOURCE_KEYS = ["twitter", "web", "gnews_ec", "reddit", "media"] as const;
 
 const DATE_PRESETS = [
   { label: "7d",  days: 7 },
@@ -148,7 +148,7 @@ export default function SearchPage() {
   const [input,      setInput]      = useState("");
   const [query,      setQuery]      = useState("");
   const [sources,    setSources]    = useState<string[]>(["gnews_ec", "media"]);
-  const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "bluesky" | "media">("all");
+  const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "reddit" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
   const [dateDays,   setDateDays]   = useState(60);
 
@@ -177,7 +177,7 @@ export default function SearchPage() {
     twitter:  all.filter(r => r.platform === "twitter"),
     web:      all.filter(r => r.platform === "web"),
     gnews_ec: all.filter(r => r.platform === "gnews_ec"),
-    bluesky:  all.filter(r => r.platform === "bluesky"),
+    reddit:   all.filter(r => r.platform === "reddit"),
     media:    all.filter(r => r.platform === "media"),
   };
 
@@ -316,7 +316,7 @@ export default function SearchPage() {
                   { key: "twitter",  label: `𝕏 Twitter (${byPlatform.twitter.length})` },
                   { key: "web",      label: `📰 Google News (${byPlatform.web.length})` },
                   { key: "gnews_ec", label: `🇪🇨 Google News EC (${byPlatform.gnews_ec.length})` },
-                  { key: "bluesky",  label: `☁ Bluesky (${byPlatform.bluesky.length})` },
+                  { key: "reddit",   label: `🟠 Reddit (${byPlatform.reddit.length})` },
                   { key: "media",    label: `📺 Medios EC (${byPlatform.media.length})` },
                 ].map(({ key, label }) => (
                   <button key={key} onClick={() => setTab(key as any)} style={{
