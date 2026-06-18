@@ -29,12 +29,37 @@ GNEWS_URL     = "https://news.google.com/rss/search"
 
 
 MEDIA_DOMAINS = [
+    # ── TV nacional ──
     "ecuavisa.com",
     "teleamazonas.com",
-    "extra.ec",
-    "primicias.ec",
-    "elcomercio.com",
+    "tctelevision.com",
+    "ecuadortv.ec",
+    "gamavision.com.ec",
+    # ── Prensa escrita ──
     "eluniverso.com",
+    "elcomercio.com",
+    "primicias.ec",
+    "expreso.ec",
+    "extra.ec",
+    "vistazo.com",
+    "eltelegrafo.com.ec",
+    "lahora.com.ec",
+    "laposta.ec",
+    # ── Radios ──
+    "publicafm.ec",
+    "radiosucesos.fm",
+    "ecuadoradio.ec",
+    "radiocentro.com.ec",
+    "kchcomunicacion.com",
+    "radiosucre.com.ec",
+    "fmmundo.com",
+    # ── Internacional (cobertura de Ecuador) ──
+    "efe.com",
+    "infobae.com",
+    "swissinfo.ch",
+    "dw.com",
+    "elpais.com",
+    "prensa-latina.cu",
 ]
 
 # Whitelist of Ecuadorian news outlets — used to filter Google News EC results
@@ -51,6 +76,10 @@ EC_MEDIA_DOMAINS = {
     "ecuadortv.ec", "elobservador.ec", "surtidordenoticias.com",
     "primicias.com.ec", "edicionmedica.ec", "revistagestion.ec",
     "elcomercio", "diarioextra.ec",
+    # Medios añadidos para monitoreo
+    "ecuadortv.ec", "gamavision.com.ec", "laposta.ec", "publicafm.ec",
+    "radiosucesos.fm", "ecuadoradio.ec", "radiocentro.com.ec",
+    "kchcomunicacion.com", "radiosucre.com.ec", "fmmundo.com",
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -282,12 +311,17 @@ def _matches_query(text: str, q: str) -> bool:
 
 # Sites that support WordPress-style search RSS (most reliable — own index)
 SITE_SEARCH_RSS: dict[str, str] = {
-    "eluniverso.com":   "https://www.eluniverso.com/?s={q}&feed=rss2",
-    "elcomercio.com":   "https://www.elcomercio.com/?s={q}&feed=rss2",
-    "primicias.ec":     "https://www.primicias.ec/?s={q}&feed=rss2",
-    "extra.ec":         "https://www.extra.ec/?s={q}&feed=rss2",
-    "teleamazonas.com": "https://www.teleamazonas.com/?s={q}&feed=rss2",
-    "ecuavisa.com":     "https://www.ecuavisa.com/?s={q}&feed=rss2",
+    "eluniverso.com":    "https://www.eluniverso.com/?s={q}&feed=rss2",
+    "elcomercio.com":    "https://www.elcomercio.com/?s={q}&feed=rss2",
+    "primicias.ec":      "https://www.primicias.ec/?s={q}&feed=rss2",
+    "extra.ec":          "https://www.extra.ec/?s={q}&feed=rss2",
+    "teleamazonas.com":  "https://www.teleamazonas.com/?s={q}&feed=rss2",
+    "ecuavisa.com":      "https://www.ecuavisa.com/?s={q}&feed=rss2",
+    "expreso.ec":        "https://www.expreso.ec/?s={q}&feed=rss2",
+    "vistazo.com":       "https://www.vistazo.com/?s={q}&feed=rss2",
+    "lahora.com.ec":     "https://www.lahora.com.ec/?s={q}&feed=rss2",
+    "eltelegrafo.com.ec":"https://www.eltelegrafo.com.ec/?s={q}&feed=rss2",
+    "laposta.ec":        "https://www.laposta.ec/?s={q}&feed=rss2",
 }
 
 HEADERS_MEDIA = {
@@ -373,12 +407,16 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             log.debug("GNews site error [%s]: %s", domain, exc)
             return []
 
+    # Cap concurrency so many domains don't trigger Google News rate-limiting (429)
+    sem = asyncio.Semaphore(8)
+
     async def _one(domain: str) -> list[RawResult]:
-        # Run both in parallel, merge (dedup by URL via seen_urls set)
-        site_results, gnews_results = await asyncio.gather(
-            _fetch_site_rss(domain),
-            _fetch_gnews_site(domain),
-        )
+        async with sem:
+            # Run both in parallel, merge (dedup by URL via seen_urls set)
+            site_results, gnews_results = await asyncio.gather(
+                _fetch_site_rss(domain),
+                _fetch_gnews_site(domain),
+            )
         return site_results + gnews_results
 
     batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
