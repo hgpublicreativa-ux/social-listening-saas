@@ -67,14 +67,14 @@ export default function Dashboard({ projectId, projectName }: Props) {
   };
 
   return (
-    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="page-pad" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div className="dash-header">
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>{projectName}</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{rangeLabel} · tiempo real</p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+        <div className="date-controls">
           {/* Preset buttons */}
           <div style={{ display: "flex", gap: 6 }}>
             {PRESETS.map(({ label, days }) => (
@@ -129,7 +129,7 @@ export default function Dashboard({ projectId, projectName }: Props) {
       </div>
 
       {/* KPI row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="kpi-grid">
         <MetricsCard title="Total Menciones"   value={totals.mentions}   color="accent"  sub={rangeLabel} />
         <MetricsCard title="Sentimiento +"      value={`${sentimentPct}%`} color="green"   sub={`${totals.positive} positivas`} />
         <MetricsCard title="Sentimiento −"      value={`${totals.mentions > 0 ? Math.round(totals.negative / totals.mentions * 100) : 0}%`} color="red" sub={`${totals.negative} negativas`} />
@@ -147,7 +147,7 @@ export default function Dashboard({ projectId, projectName }: Props) {
       </div>
 
       {/* Bottom row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
+      <div className="dash-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 500 }}>
           <p style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
             <BarChart2 size={15} color="#58a6ff" /> Feed de Menciones

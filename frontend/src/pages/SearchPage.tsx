@@ -170,7 +170,7 @@ export default function SearchPage() {
   const negPct  = s && s.total > 0 ? Math.round(s.negative / s.total * 100) : 0;
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1020 }}>
+    <div className="page-pad">
       {/* Search bar */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Búsqueda en Tiempo Real</h1>
@@ -178,7 +178,7 @@ export default function SearchPage() {
           Sentimiento, alcance y engagement al instante desde múltiples fuentes.
         </p>
 
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div className="search-bar-row" style={{ display: "flex", gap: 10, marginBottom: 12 }}>
           <div style={{ position: "relative", flex: 1 }}>
             <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
             <input
@@ -247,7 +247,7 @@ export default function SearchPage() {
       {!isFetching && data && (
         <>
           {/* KPI row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 24 }}>
+          <div className="kpi-grid" style={{ marginBottom: 24 }}>
             <KpiCard label="Menciones"    value={s!.total}      color="var(--accent)"  sub={`"${data.query}"`} />
             <KpiCard label="Positivo"     value={`${sentPct}%`} color="#3fb950"        sub={`${s!.positive} positivas`} />
             <KpiCard label="Negativo"     value={`${negPct}%`}  color="#f85149"        sub={`${s!.negative} negativas`} />
@@ -256,7 +256,7 @@ export default function SearchPage() {
           </div>
 
           {/* Main content: feed + sidebar */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 20, alignItems: "start" }}>
+          <div className="search-grid">
 
             {/* Feed */}
             <div>

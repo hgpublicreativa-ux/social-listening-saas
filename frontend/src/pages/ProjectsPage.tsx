@@ -47,7 +47,7 @@ export default function ProjectsPage({ onSelect }: Props) {
   };
 
   return (
-    <div style={{ padding: "32px 40px", maxWidth: 800 }}>
+    <div className="page-pad">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>Proyectos de Monitoreo</h1>
