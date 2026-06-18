@@ -218,6 +218,10 @@ async def _fetch_gnews(
                 # EC-only: keep whitelisted outlets OR any .ec domain (Ecuadorian)
                 if ec_only and not (dom in EC_MEDIA_DOMAINS or dom.endswith(".ec")):
                     continue
+                # Exact phrase filter for quoted queries
+                entry_text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
+                if not _matches_query(entry_text, q):
+                    continue
                 pub = (
                     datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
                     if e.get("published_parsed")
@@ -404,6 +408,8 @@ async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
                 title   = e.get("title", "")
                 summary = _re.sub(r"<[^>]+>", " ", e.get("summary", "")).strip()
                 text    = f"{title} {summary}".strip()
+                if not _matches_query(text, q):
+                    continue
                 author  = e.get("author", "").replace("/u/", "").strip()
                 url     = e.get("link", "")
                 subreddit = ""

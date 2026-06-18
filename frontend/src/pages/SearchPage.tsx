@@ -271,10 +271,30 @@ export default function SearchPage() {
 
       {/* Loading */}
       {isFetching && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>
-          <div style={{ fontSize: 36, marginBottom: 14 }}>🔍</div>
-          <p style={{ fontSize: 14, fontWeight: 600 }}>Buscando y analizando con IA...</p>
-          <p style={{ fontSize: 12, marginTop: 8 }}>Consultando X, Google News y Bluesky en paralelo</p>
+        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-muted)" }}>
+          <style>{`
+            @keyframes lupa-swing {
+              0%   { transform: rotate(-15deg) scale(1);   }
+              25%  { transform: rotate(15deg)  scale(1.1); }
+              50%  { transform: rotate(-10deg) scale(1);   }
+              75%  { transform: rotate(10deg)  scale(1.05);}
+              100% { transform: rotate(-15deg) scale(1);   }
+            }
+            @keyframes dots {
+              0%   { content: ".";   }
+              33%  { content: "..";  }
+              66%  { content: "..."; }
+              100% { content: ".";   }
+            }
+            .lupa-anim { display:inline-block; animation: lupa-swing 1.2s ease-in-out infinite; font-size: 56px; }
+            .magic-dots::after { content: "..."; animation: dots 1.4s steps(1) infinite; }
+          `}</style>
+          <div className="lupa-anim">🔍</div>
+          <p style={{ fontSize: 18, fontWeight: 800, marginTop: 20, color: "var(--text)" }}>
+            Espera mientras la magia ocurre
+            <span className="magic-dots" />
+          </p>
+          <p style={{ fontSize: 13, marginTop: 10 }}>Consultando fuentes en paralelo y analizando con IA</p>
         </div>
       )}
 
