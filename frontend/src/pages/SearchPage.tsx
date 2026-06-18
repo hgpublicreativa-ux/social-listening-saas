@@ -339,16 +339,16 @@ export default function SearchPage() {
       </div>
 
       {/* Sources */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: heroMode ? 0 : 10 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", marginBottom: heroMode ? 0 : 10, overflowX: "auto" }}>
         <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Fuentes:</span>
         {SOURCE_KEYS.map(k => (
           <button key={k} onClick={() => toggleSrc(k)} style={{
             background:   sources.includes(k) ? `${PCOLOR[k]}20` : "transparent",
             color:        sources.includes(k) ? PCOLOR[k] : "var(--text-muted)",
             border:       `1px solid ${sources.includes(k) ? PCOLOR[k] : "var(--border)"}`,
-            borderRadius: 20, padding: "4px 14px", fontSize: 12, cursor: "pointer",
+            borderRadius: 20, padding: "4px 12px", fontSize: 12, cursor: "pointer",
             fontWeight:   sources.includes(k) ? 700 : 400,
-            transition:   "all .15s",
+            transition:   "all .15s", whiteSpace: "nowrap", flexShrink: 0,
           }}>
             {PICON[k]} {PLABEL[k]}
           </button>
