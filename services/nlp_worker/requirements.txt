@@ -1,9 +1,7 @@
 asyncpg==0.29.0
 sqlalchemy[asyncio]==2.0.30
 redis[asyncio]==5.0.4
-anthropic==0.29.0
-transformers==4.41.0
-torch==2.3.0
+openai==1.30.0
 python-dotenv==1.0.1
 structlog==24.1.0
 tenacity==8.3.0
