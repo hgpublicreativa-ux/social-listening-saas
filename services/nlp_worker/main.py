@@ -122,10 +122,15 @@ async def run():
             log.error("NLP processing failed: %s", exc)
             continue
 
-        async with AsyncSessionLocal() as session:
-            async with session.begin():
-                profile_id = await upsert_profile(session, mention.get("author", {}), mention["platform"])
-                await save_mention(session, mention, nlp, profile_id)
+        try:
+            async with AsyncSessionLocal() as session:
+                async with session.begin():
+                    profile_id = await upsert_profile(session, mention.get("author", {}), mention["platform"])
+                    await save_mention(session, mention, nlp, profile_id)
+        except Exception as exc:
+            log.warning("DB save skipped (project_id=%s platform=%s): %s",
+                        mention.get("project_id"), mention.get("platform"), exc)
+            continue
 
         enriched = {**envelope, "raw": {**mention}, "nlp": nlp}
         await producer.send("enriched-mentions", value=enriched)
