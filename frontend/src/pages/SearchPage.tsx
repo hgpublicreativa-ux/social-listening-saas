@@ -249,25 +249,24 @@ export default function SearchPage() {
           )}
         </div>
 
-        {/* Date range presets — visible only when results exist */}
-        {data && !isFetching && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
-            <Calendar size={13} color="var(--text-muted)" />
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Período:</span>
-            {DATE_PRESETS.map(({ label, days }) => (
-              <button key={days} onClick={() => setDateDays(days)}
-                className={dateDays === days ? "btn-primary" : "btn-ghost"}
-                style={{ padding: "3px 10px", fontSize: 12 }}>
-                {label}
-              </button>
-            ))}
-            {dateDays > 0 && (
-              <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
-                · {all.length} resultado{all.length !== 1 ? "s" : ""} en los últimos {dateDays} días
-              </span>
-            )}
-          </div>
-        )}
+        {/* Date range presets */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+          <Calendar size={13} color="var(--text-muted)" />
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Período:</span>
+          {DATE_PRESETS.map(({ label, days }) => (
+            <button key={days} onClick={() => setDateDays(days)}
+              disabled={!data}
+              className={dateDays === days ? "btn-primary" : "btn-ghost"}
+              style={{ padding: "3px 10px", fontSize: 12, opacity: !data ? 0.4 : 1 }}>
+              {label}
+            </button>
+          ))}
+          {data && dateDays > 0 && (
+            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
+              · {all.length} resultado{all.length !== 1 ? "s" : ""} en los últimos {dateDays} días
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Loading */}
