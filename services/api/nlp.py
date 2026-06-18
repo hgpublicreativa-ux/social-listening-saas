@@ -59,19 +59,26 @@ async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
         else:
             uncached.append(item)
 
-    for i in range(0, len(uncached), 20):
-        batch = uncached[i:i + 20]
-        payload = [{"id": x["id"], "text": x["text"][:600]} for x in batch]
+    for i in range(0, len(uncached), 8):   # smaller batches → no truncation
+        batch = uncached[i:i + 8]
+        payload = [{"id": x["id"], "text": x["text"][:300]} for x in batch]
         try:
             resp = await _client.chat.completions.create(
                 model="gpt-4o-mini",
-                max_tokens=2048,
+                max_tokens=4096,
                 temperature=0,
                 messages=[{"role": "user", "content": PROMPT.format(
                     texts_json=json.dumps(payload, ensure_ascii=False)
                 )}],
             )
-            parsed = json.loads(resp.choices[0].message.content)
+            content = resp.choices[0].message.content or ""
+            # Strip markdown code fences if present
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            parsed = json.loads(content)
             for r in parsed:
                 rid = r.get("id")
                 if not rid:

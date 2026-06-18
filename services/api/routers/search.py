@@ -192,7 +192,7 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 
 async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
-        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 25, "lang": "es"}, timeout=10)
+        r = await client.get(BLUESKY_URL, params={"q": q, "limit": 25}, timeout=10)
         if r.status_code != 200:
             return []
         results = []
