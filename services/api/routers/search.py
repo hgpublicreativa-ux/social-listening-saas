@@ -53,6 +53,10 @@ MEDIA_DOMAINS = [
     "kchcomunicacion.com",
     "radiosucre.com.ec",
     "fmmundo.com",
+    "cre.com.ec",
+    "primeraplana.com.ec",
+    "radioforever925.com",
+    "wqradio.com",
     # ── Internacional (cobertura de Ecuador) ──
     "efe.com",
     "infobae.com",
@@ -80,6 +84,7 @@ EC_MEDIA_DOMAINS = {
     "ecuadortv.ec", "gamavision.com.ec", "laposta.ec", "publicafm.ec",
     "radiosucesos.fm", "ecuadoradio.ec", "radiocentro.com.ec",
     "kchcomunicacion.com", "radiosucre.com.ec", "fmmundo.com",
+    "cre.com.ec", "primeraplana.com.ec", "radioforever925.com", "wqradio.com",
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -322,6 +327,10 @@ SITE_SEARCH_RSS: dict[str, str] = {
     "lahora.com.ec":     "https://www.lahora.com.ec/?s={q}&feed=rss2",
     "eltelegrafo.com.ec":"https://www.eltelegrafo.com.ec/?s={q}&feed=rss2",
     "laposta.ec":        "https://www.laposta.ec/?s={q}&feed=rss2",
+    "cre.com.ec":        "https://www.cre.com.ec/?s={q}&feed=rss2",
+    "primeraplana.com.ec": "https://primeraplana.com.ec/?s={q}&feed=rss2",
+    "radioforever925.com": "https://www.radioforever925.com/?s={q}&feed=rss2",
+    "wqradio.com":       "https://wqradio.com/?s={q}&feed=rss2",
 }
 
 HEADERS_MEDIA = {
