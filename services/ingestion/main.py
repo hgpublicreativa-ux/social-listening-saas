@@ -12,6 +12,7 @@ from connectors.youtube import YouTubeConnector
 from connectors.tiktok import TikTokConnector
 from connectors.scraper import WebScraperConnector
 from connectors.reddit import RedditConnector
+from connectors.facebook import FacebookConnector
 from streams import StreamProducer
 
 load_dotenv()
@@ -96,6 +97,10 @@ async def run():
             if ("reddit" in sources or "web" in sources) and os.getenv("REDDIT_CLIENT_ID"):
                 running_tasks.append(asyncio.create_task(
                     RedditConnector(producer, redis, pid, keywords).run()
+                ))
+            if "facebook" in sources and os.getenv("FACEBOOK_ACCESS_TOKEN") and os.getenv("FACEBOOK_PAGE_IDS"):
+                running_tasks.append(asyncio.create_task(
+                    FacebookConnector(producer, redis, pid, keywords).run()
                 ))
 
         log.info("Started %d ingestion tasks for %d projects", len(running_tasks), len(projects))
