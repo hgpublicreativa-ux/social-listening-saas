@@ -49,18 +49,29 @@ class TwitterConnector:
             r.raise_for_status()
             log.info("Twitter stream rules set: %s", [kw for kw in self.keywords])
 
-    @retry(wait=wait_exponential(min=5, max=60), stop=stop_after_attempt(10))
     async def run(self):
         if not BEARER:
             log.warning("TWITTER_BEARER_TOKEN not set — skipping Twitter connector")
             return
 
-        await self._sync_rules()
+        try:
+            await self._sync_rules()
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
+            if code in (401, 403):
+                log.error("Twitter auth failed (HTTP %d) — invalid/expired token, "
+                          "disabling Twitter connector. Set a valid TWITTER_BEARER_TOKEN.", code)
+                return
+            log.error("Twitter rules sync failed (HTTP %d) — disabling connector", code)
+            return
+        except Exception as exc:
+            log.error("Twitter connector init failed: %s — disabling", exc)
+            return
 
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("GET", STREAM_URL, headers=HEADERS) as resp:
                 if resp.status_code != 200:
-                    log.error("Twitter stream HTTP %d", resp.status_code)
+                    log.error("Twitter stream HTTP %d — disabling connector", resp.status_code)
                     return
 
                 log.info("Twitter filtered stream connected")

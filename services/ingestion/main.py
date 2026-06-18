@@ -11,6 +11,7 @@ from connectors.twitter import TwitterConnector
 from connectors.youtube import YouTubeConnector
 from connectors.tiktok import TikTokConnector
 from connectors.scraper import WebScraperConnector
+from connectors.reddit import RedditConnector
 from streams import StreamProducer
 
 load_dotenv()
@@ -91,6 +92,11 @@ async def run():
             if "web" in sources:
                 running_tasks.append(asyncio.create_task(
                     WebScraperConnector(producer, redis, pid, keywords).run()
+                ))
+            # Reddit needs no API key — always available when requested or by default
+            if "reddit" in sources or "web" in sources:
+                running_tasks.append(asyncio.create_task(
+                    RedditConnector(producer, redis, pid, keywords).run()
                 ))
 
         log.info("Started %d ingestion tasks for %d projects", len(running_tasks), len(projects))
