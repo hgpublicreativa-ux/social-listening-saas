@@ -226,47 +226,106 @@ def _matches_query(text: str, q: str) -> bool:
     return any(tok in haystack for tok in tokens)
 
 
+# Sites that support WordPress-style search RSS (most reliable — own index)
+SITE_SEARCH_RSS: dict[str, str] = {
+    "eluniverso.com":   "https://www.eluniverso.com/?s={q}&feed=rss2",
+    "elcomercio.com":   "https://www.elcomercio.com/?s={q}&feed=rss2",
+    "primicias.ec":     "https://www.primicias.ec/?s={q}&feed=rss2",
+    "extra.ec":         "https://www.extra.ec/?s={q}&feed=rss2",
+    "teleamazonas.com": "https://www.teleamazonas.com/?s={q}&feed=rss2",
+    "ecuavisa.com":     "https://www.ecuavisa.com/?s={q}&feed=rss2",
+}
+
+HEADERS_MEDIA = {
+    "User-Agent": "Mozilla/5.0 (compatible; SocialMonitor/1.0; +https://socialmonitor.app)",
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+}
+
+
 async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
-    """Searches all Ecuadorian media domains via Google News site: operator in parallel."""
-    async def _one(domain: str) -> list[RawResult]:
+    """
+    Fetches from Ecuadorian media using two strategies per domain (in parallel):
+    1. Site's own search RSS (?s=q&feed=rss2) — most accurate, own index
+    2. Google News RSS (site:domain q) — fallback, broader coverage
+    Deduplicates by URL. No post-keyword filter — both sources already filter by query.
+    """
+    seen_urls: set[str] = set()
+
+    def _parse_entries(entries, domain: str, limit: int = 15) -> list[RawResult]:
+        out = []
+        for e in entries[:limit]:
+            try:
+                url = e.get("link", "")
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                pub = (
+                    datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+                    if e.get("published_parsed")
+                    else datetime.now(timezone.utc).isoformat()
+                )
+                title   = e.get("title", "")
+                summary = e.get("summary", "")
+                # Strip HTML tags from summary
+                import re as _re
+                summary = _re.sub(r"<[^>]+>", " ", summary).strip()
+                text = f"{title} {summary}".strip()
+                if not title:
+                    continue
+                out.append(RawResult(
+                    id=e.get("id") or url or str(uuid.uuid4()),
+                    platform="media",
+                    text=text[:1000],
+                    title=title,
+                    url=url,
+                    author=domain,
+                    author_id=domain,
+                    followers=0,
+                    published_at=pub,
+                    source=domain,
+                ))
+            except Exception:
+                continue
+        return out
+
+    async def _fetch_site_rss(domain: str) -> list[RawResult]:
+        """Try site's own search RSS first."""
+        template = SITE_SEARCH_RSS.get(domain)
+        if not template:
+            return []
+        url = template.format(q=q.replace(" ", "+"))
+        try:
+            r = await client.get(url, headers=HEADERS_MEDIA, timeout=12)
+            if r.status_code != 200:
+                return []
+            feed = feedparser.parse(r.text)
+            return _parse_entries(feed.entries, domain, limit=20)
+        except Exception as exc:
+            log.debug("Site RSS error [%s]: %s", domain, exc)
+            return []
+
+    async def _fetch_gnews_site(domain: str) -> list[RawResult]:
+        """Google News site: fallback."""
         try:
             r = await client.get(
                 GNEWS_URL,
                 params={"q": f"{q} site:{domain}", "hl": "es", "gl": "EC", "ceid": "EC:es"},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=10,
+                headers=HEADERS_MEDIA,
+                timeout=12,
             )
             feed = feedparser.parse(r.text)
-            out  = []
-            for e in feed.entries[:15]:
-                try:
-                    pub = (
-                        datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
-                        if e.get("published_parsed")
-                        else datetime.now(timezone.utc).isoformat()
-                    )
-                    text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
-                    # Post-filter: ensure article actually contains the keyword
-                    if not _matches_query(text, q):
-                        continue
-                    out.append(RawResult(
-                        id=e.get("id") or e.get("link") or str(uuid.uuid4()),
-                        platform="media",
-                        text=text[:1000],
-                        title=e.get("title", ""),
-                        url=e.get("link", ""),
-                        author=domain,
-                        author_id=domain,
-                        followers=0,
-                        published_at=pub,
-                        source=domain,
-                    ))
-                except Exception:
-                    continue
-            return out
+            return _parse_entries(feed.entries, domain, limit=15)
         except Exception as exc:
-            log.warning("Media fetch error [%s]: %s", domain, exc)
+            log.debug("GNews site error [%s]: %s", domain, exc)
             return []
+
+    async def _one(domain: str) -> list[RawResult]:
+        # Run both in parallel, merge (dedup by URL via seen_urls set)
+        site_results, gnews_results = await asyncio.gather(
+            _fetch_site_rss(domain),
+            _fetch_gnews_site(domain),
+        )
+        return site_results + gnews_results
 
     batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
     results = [r for batch in batches for r in batch]
