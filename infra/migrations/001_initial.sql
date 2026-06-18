@@ -1,9 +1,14 @@
--- Enable required extensions
+-- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+-- TimescaleDB optional: skip gracefully if not installed
+DO $$ BEGIN
+    CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'TimescaleDB not available, using plain tables';
+END $$;
 
 -- ── Organizations & Users ────────────────────────────────────────────────
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name        TEXT NOT NULL,
     plan        TEXT NOT NULL DEFAULT 'free',
@@ -11,7 +16,7 @@ CREATE TABLE organizations (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id          UUID REFERENCES organizations(id) ON DELETE CASCADE,
     email           TEXT UNIQUE NOT NULL,
@@ -20,8 +25,8 @@ CREATE TABLE users (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ── Projects (monitoring campaigns) ─────────────────────────────────────
-CREATE TABLE projects (
+-- ── Projects ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS projects (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id          UUID REFERENCES organizations(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
@@ -33,7 +38,7 @@ CREATE TABLE projects (
 );
 
 -- ── Social Profiles ──────────────────────────────────────────────────────
-CREATE TABLE social_profiles (
+CREATE TABLE IF NOT EXISTS social_profiles (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     platform        TEXT NOT NULL,
     platform_id     TEXT NOT NULL,
@@ -48,8 +53,8 @@ CREATE TABLE social_profiles (
     UNIQUE(platform, platform_id)
 );
 
--- ── Mentions (core entity) ───────────────────────────────────────────────
-CREATE TABLE mentions (
+-- ── Mentions ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS mentions (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id          UUID REFERENCES projects(id) ON DELETE CASCADE,
     profile_id          UUID REFERENCES social_profiles(id),
@@ -61,14 +66,12 @@ CREATE TABLE mentions (
     language            CHAR(2),
     published_at        TIMESTAMPTZ NOT NULL,
     ingested_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    -- NLP enrichment
     sentiment           TEXT,
     sentiment_score     NUMERIC(4,3),
     keywords            TEXT[] DEFAULT '{}',
     entities            JSONB DEFAULT '[]',
     summary             TEXT,
     nlp_tier            TEXT DEFAULT 'pending',
-    -- raw metrics at ingest
     likes               BIGINT DEFAULT 0,
     shares              BIGINT DEFAULT 0,
     comments            BIGINT DEFAULT 0,
@@ -76,14 +79,14 @@ CREATE TABLE mentions (
     UNIQUE(platform, platform_post_id)
 );
 
-CREATE INDEX idx_mentions_project_published ON mentions(project_id, published_at DESC);
-CREATE INDEX idx_mentions_sentiment ON mentions(project_id, sentiment);
-CREATE INDEX idx_mentions_platform ON mentions(platform, published_at DESC);
-CREATE INDEX idx_mentions_entities ON mentions USING GIN(entities);
-CREATE INDEX idx_mentions_keywords ON mentions USING GIN(keywords);
+CREATE INDEX IF NOT EXISTS idx_mentions_project_published ON mentions(project_id, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mentions_sentiment ON mentions(project_id, sentiment);
+CREATE INDEX IF NOT EXISTS idx_mentions_platform ON mentions(platform, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mentions_entities ON mentions USING GIN(entities);
+CREATE INDEX IF NOT EXISTS idx_mentions_keywords ON mentions USING GIN(keywords);
 
--- ── Time-series metrics (hypertable) ────────────────────────────────────
-CREATE TABLE metrics_hourly (
+-- ── Metrics (plain table, no TimescaleDB required) ───────────────────────
+CREATE TABLE IF NOT EXISTS metrics_hourly (
     bucket              TIMESTAMPTZ NOT NULL,
     project_id          UUID NOT NULL,
     platform            TEXT NOT NULL,
@@ -97,15 +100,19 @@ CREATE TABLE metrics_hourly (
     PRIMARY KEY (bucket, project_id, platform)
 );
 
-SELECT create_hypertable('metrics_hourly', 'bucket');
+CREATE INDEX IF NOT EXISTS idx_metrics_project ON metrics_hourly(project_id, bucket DESC);
 
-CREATE INDEX idx_metrics_project ON metrics_hourly(project_id, bucket DESC);
+-- Optionally promote to hypertable if TimescaleDB is available
+DO $$ BEGIN
+    PERFORM create_hypertable('metrics_hourly', 'bucket', if_not_exists => TRUE);
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping hypertable creation: %', SQLERRM;
+END $$;
 
--- Continuous aggregate: daily rollup
-CREATE MATERIALIZED VIEW metrics_daily
-WITH (timescaledb.continuous) AS
+-- Daily rollup view (plain SQL, works without TimescaleDB)
+CREATE OR REPLACE VIEW metrics_daily AS
 SELECT
-    time_bucket('1 day', bucket) AS day,
+    date_trunc('day', bucket) AS day,
     project_id,
     platform,
     SUM(mention_count)       AS mention_count,
@@ -115,17 +122,10 @@ SELECT
     SUM(total_reach)         AS total_reach,
     SUM(total_engagement)    AS total_engagement
 FROM metrics_hourly
-GROUP BY 1, 2, 3
-WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('metrics_daily',
-    start_offset  => INTERVAL '3 days',
-    end_offset    => INTERVAL '1 hour',
-    schedule_interval => INTERVAL '1 hour'
-);
+GROUP BY 1, 2, 3;
 
 -- ── Creator Rankings ─────────────────────────────────────────────────────
-CREATE TABLE creator_rankings (
+CREATE TABLE IF NOT EXISTS creator_rankings (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id      UUID REFERENCES projects(id) ON DELETE CASCADE,
     profile_id      UUID REFERENCES social_profiles(id),
@@ -140,7 +140,7 @@ CREATE TABLE creator_rankings (
 );
 
 -- ── Alert Rules ──────────────────────────────────────────────────────────
-CREATE TABLE alert_rules (
+CREATE TABLE IF NOT EXISTS alert_rules (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id      UUID REFERENCES projects(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE alert_rules (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE alert_events (
+CREATE TABLE IF NOT EXISTS alert_events (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     rule_id         UUID REFERENCES alert_rules(id) ON DELETE CASCADE,
     triggered_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -164,5 +164,7 @@ CREATE TABLE alert_events (
     error           TEXT
 );
 
--- Seed demo org
-INSERT INTO organizations(name, plan) VALUES ('Demo Org', 'pro') RETURNING id;
+-- Seed default org (idempotent)
+INSERT INTO organizations(name, plan)
+SELECT 'Demo Org', 'pro'
+WHERE NOT EXISTS (SELECT 1 FROM organizations);
