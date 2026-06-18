@@ -340,7 +340,6 @@ export default function SearchPage() {
 
       {/* Sources */}
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", marginBottom: heroMode ? 0 : 10, overflowX: "auto" }}>
-        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Fuentes:</span>
         {SOURCE_KEYS.map(k => (
           <button key={k} onClick={() => toggleSrc(k)} style={{
             background:   sources.includes(k) ? `${PCOLOR[k]}20` : "transparent",
