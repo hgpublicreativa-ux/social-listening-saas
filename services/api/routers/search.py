@@ -498,13 +498,19 @@ async def live_search(
     sources: str = Query("twitter,web,bluesky,media"),
     _user =  Depends(get_current_user),
 ):
-    # Parse category filter from query: "categoria: XXX"
+    # Parse category filter from query: "categoria: XXX" (accent-insensitive)
     category = None
     query_for_search = q
-    if "categoria:" in q.lower():
-        parts = q.lower().split("categoria:", 1)
+    q_norm = _normalize(q)
+    if "categoria:" in q_norm:
+        parts = q_norm.split("categoria:", 1)
         category = parts[1].strip().split()[0] if len(parts) > 1 else None
-        query_for_search = parts[0].strip() if parts[0] else q
+        # Preserve original query text minus the categoria clause
+        orig_lower = q.lower()
+        cat_idx = orig_lower.find("categoria:")
+        query_for_search = q[:cat_idx].strip() if cat_idx > 0 else ""
+        if not query_for_search:
+            query_for_search = category  # fall back to category as search term
 
     src_list = [s.strip() for s in sources.split(",")]
     redis    = Redis.from_url(REDIS_URL, decode_responses=True)
@@ -553,11 +559,12 @@ async def live_search(
                 summary=         nlp.get("summary", ""),
             ))
 
-        # Filter by category if requested (confidence >= 0.6)
+        # Filter by category if requested (confidence >= 0.6, accent-insensitive)
         if category:
             enriched = [
                 r for r in enriched
-                if nlp_map.get(r.id, {}).get("category") == category and nlp_map.get(r.id, {}).get("category_confidence", 0) >= 0.6
+                if _normalize(nlp_map.get(r.id, {}).get("category", "")) == _normalize(category)
+                and nlp_map.get(r.id, {}).get("category_confidence", 0) >= 0.6
             ]
 
         # Aggregate summary

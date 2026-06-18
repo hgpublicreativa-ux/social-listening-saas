@@ -63,6 +63,11 @@ def _fallback(item_id: str, text: str) -> dict:
     }
 
 
+def _normalize_str(s: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("ascii").lower()
+
+
 async def enrich_batch(redis: Redis, items: list[dict], category: str = None) -> dict[str, dict]:
     """
     items: list of {"id": str, "text": str}
@@ -83,7 +88,8 @@ async def enrich_batch(redis: Redis, items: list[dict], category: str = None) ->
     async def _process_batch(batch: list[dict]) -> None:
         payload = [{"id": x["id"], "text": x["text"][:300]} for x in batch]
         try:
-            prompt = PROMPT_WITH_CATEGORY.format(category=category) if category else PROMPT
+            cat_norm = _normalize_str(category) if category else None
+            prompt = PROMPT_WITH_CATEGORY.format(category=cat_norm) if cat_norm else PROMPT
             resp = await _client.chat.completions.create(
                 model="gpt-4o-mini",
                 max_tokens=4096,
