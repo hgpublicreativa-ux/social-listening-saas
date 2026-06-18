@@ -28,6 +28,15 @@ TWITTER_URL   = f"https://{RAPIDAPI_HOST}/search"
 GNEWS_URL     = "https://news.google.com/rss/search"
 BLUESKY_URL   = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
 
+MEDIA_DOMAINS = [
+    "ecuavisa.com",
+    "teleamazonas.com",
+    "extra.ec",
+    "primicias.ec",
+    "elcomercio.com",
+    "eluniverso.com",
+]
+
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
@@ -190,6 +199,51 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
         return []
 
 
+async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
+    """Searches all Ecuadorian media domains via Google News site: operator in parallel."""
+    async def _one(domain: str) -> list[RawResult]:
+        try:
+            r = await client.get(
+                GNEWS_URL,
+                params={"q": f"{q} site:{domain}", "hl": "es", "gl": "EC", "ceid": "EC:es"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            feed = feedparser.parse(r.text)
+            out  = []
+            for e in feed.entries[:10]:
+                try:
+                    pub = (
+                        datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+                        if e.get("published_parsed")
+                        else datetime.now(timezone.utc).isoformat()
+                    )
+                    text = f"{e.get('title', '')} {e.get('summary', '')}".strip()
+                    out.append(RawResult(
+                        id=e.get("id") or e.get("link") or str(uuid.uuid4()),
+                        platform="media",
+                        text=text[:1000],
+                        title=e.get("title", ""),
+                        url=e.get("link", ""),
+                        author=domain,
+                        author_id=domain,
+                        followers=0,
+                        published_at=pub,
+                        source=domain,
+                    ))
+                except Exception:
+                    continue
+            return out
+        except Exception as exc:
+            log.warning("Media fetch error [%s]: %s", domain, exc)
+            return []
+
+    batches = await asyncio.gather(*[_one(d) for d in MEDIA_DOMAINS])
+    results = [r for batch in batches for r in batch]
+    results.sort(key=lambda r: r.published_at, reverse=True)
+    return results
+
+
 async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
     try:
         r = await client.get(BLUESKY_URL, params={"q": q, "limit": 25}, timeout=10)
@@ -238,7 +292,7 @@ async def _fetch_bluesky(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 @router.get("", response_model=SearchResponse)
 async def live_search(
     q:       str = Query(..., min_length=1),
-    sources: str = Query("twitter,web,bluesky"),
+    sources: str = Query("twitter,web,bluesky,media"),
     _user =  Depends(get_current_user),
 ):
     src_list = [s.strip() for s in sources.split(",")]
@@ -253,6 +307,8 @@ async def live_search(
                 tasks.append(_fetch_gnews(client, q))
             if "bluesky" in src_list:
                 tasks.append(_fetch_bluesky(client, q))
+            if "media" in src_list:
+                tasks.append(_fetch_media(client, q))
             fetched_batches = await asyncio.gather(*tasks)
 
         raw: list[RawResult] = [r for batch in fetched_batches for r in batch]

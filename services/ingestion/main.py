@@ -16,6 +16,7 @@ from connectors.reddit import RedditConnector
 from connectors.facebook import FacebookConnector
 from connectors.gnews import GoogleNewsConnector
 from connectors.bluesky import BlueskyConnector
+from connectors.media import MediaConnector
 from streams import StreamProducer
 
 load_dotenv()
@@ -103,6 +104,9 @@ async def run():
                 ))
                 running_tasks.append(asyncio.create_task(
                     BlueskyConnector(producer, redis, pid, keywords).run()
+                ))
+                running_tasks.append(asyncio.create_task(
+                    MediaConnector(producer, redis, pid, keywords).run()
                 ))
             if ("reddit" in sources or "web" in sources) and os.getenv("REDDIT_CLIENT_ID"):
                 running_tasks.append(asyncio.create_task(

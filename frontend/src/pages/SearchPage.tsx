@@ -26,9 +26,9 @@ interface SearchResponse {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", bluesky: "☁" };
-const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", bluesky: "#0085ff" };
-const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", bluesky: "Bluesky" };
+const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", bluesky: "☁", media: "📺" };
+const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", bluesky: "#0085ff", media: "#e3a000" };
+const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", bluesky: "Bluesky", media: "Medios EC" };
 
 const SENT_COLOR: Record<string, string> = {
   positive: "#3fb950", negative: "#f85149", neutral: "#8b949e",
@@ -37,7 +37,7 @@ const SENT_BG: Record<string, string> = {
   positive: "rgba(63,185,80,.15)", negative: "rgba(248,81,73,.15)", neutral: "rgba(139,148,158,.12)",
 };
 
-const SOURCE_KEYS = ["twitter", "web", "bluesky"] as const;
+const SOURCE_KEYS = ["twitter", "web", "bluesky", "media"] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const doSearch = (q: string, sources: string[]): Promise<SearchResponse> =>
@@ -131,8 +131,8 @@ function ResultCard({ r }: { r: EnrichedResult }) {
 export default function SearchPage() {
   const [input,   setInput]   = useState("");
   const [query,   setQuery]   = useState("");
-  const [sources, setSources] = useState<string[]>(["twitter", "web", "bluesky"]);
-  const [tab,     setTab]     = useState<"all" | "twitter" | "web" | "bluesky">("all");
+  const [sources, setSources] = useState<string[]>(["twitter", "web", "bluesky", "media"]);
+  const [tab,     setTab]     = useState<"all" | "twitter" | "web" | "bluesky" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
@@ -159,6 +159,7 @@ export default function SearchPage() {
     twitter: all.filter(r => r.platform === "twitter"),
     web:     all.filter(r => r.platform === "web"),
     bluesky: all.filter(r => r.platform === "bluesky"),
+    media:   all.filter(r => r.platform === "media"),
   };
 
   const tabResults = tab === "all" ? all : byPlatform[tab] ?? [];
@@ -266,6 +267,7 @@ export default function SearchPage() {
                   { key: "twitter", label: `𝕏 Twitter (${byPlatform.twitter.length})` },
                   { key: "web",     label: `📰 Noticias (${byPlatform.web.length})` },
                   { key: "bluesky", label: `☁ Bluesky (${byPlatform.bluesky.length})` },
+                  { key: "media",   label: `📺 Medios EC (${byPlatform.media.length})` },
                 ].map(({ key, label }) => (
                   <button key={key} onClick={() => setTab(key as any)} style={{
                     background:   "transparent",
