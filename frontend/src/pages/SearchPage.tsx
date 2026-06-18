@@ -57,6 +57,30 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
+// GPT sometimes emits useless meta-summaries when the RSS has no real body
+// ("The text contains a link to a news article", "no content provided", etc.)
+const JUNK_SUMMARY = /contains? a link|news article|no (content|text|information|body|summary)|link to (a|an|the)|the (text|article|content) (contains|provides|is|mentions|only)|placeholder|unable to (summarize|provide)/i;
+
+function cleanSummary(s: string): string {
+  const t = (s || "").trim();
+  if (!t || JUNK_SUMMARY.test(t)) return "";
+  return t;
+}
+
+// Strip HTML tags, decode common entities, collapse whitespace
+function stripHtml(s: string): string {
+  return (s || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // ── Donut Chart (pure CSS conic-gradient) ─────────────────────────────────────
 function DonutChart({ pos, neg, neu, total }: { pos: number; neg: number; neu: number; total: number }) {
   if (total === 0) {
@@ -130,6 +154,12 @@ function SentimentBadge({ s }: { s: string }) {
 // ── Result Card ───────────────────────────────────────────────────────────────
 function ResultCard({ r }: { r: EnrichedResult }) {
   const scoreBar = Math.round((r.sentiment_score ?? 0.5) * 100);
+  const isNews   = ["web", "gnews_ec", "media"].includes(r.platform);
+  const summary   = cleanSummary(r.summary);
+  const bodyText  = stripHtml(r.text);
+  // News RSS text is always the headline/source repeated — show only the clean
+  // GPT summary for news. Fallback body text is for Twitter/Reddit posts only.
+  const showBody  = !summary && !isNews && bodyText.length > 20;
   return (
     <div className="card" style={{
       padding: "16px 18px",
@@ -172,16 +202,16 @@ function ResultCard({ r }: { r: EnrichedResult }) {
         <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "var(--text)", lineHeight: 1.4 }}>{r.title}</p>
       )}
 
-      {/* Summary (GPT) or text */}
-      {r.summary ? (
+      {/* Summary (GPT, cleaned) or fallback body text */}
+      {summary ? (
         <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.7, marginBottom: 8, fontStyle: "italic", borderLeft: "2px solid var(--border)", paddingLeft: 10 }}>
-          {r.summary}
+          {summary}
         </p>
-      ) : (
-        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.65, wordBreak: "break-word" }}>
-          {r.text.slice(0, 280)}{r.text.length > 280 ? "…" : ""}
+      ) : showBody ? (
+        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.65, wordBreak: "break-word", marginBottom: 8 }}>
+          {bodyText.slice(0, 280)}{bodyText.length > 280 ? "…" : ""}
         </p>
-      )}
+      ) : null}
 
       {/* Sentiment score bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.keywords?.length ? 10 : 0 }}>

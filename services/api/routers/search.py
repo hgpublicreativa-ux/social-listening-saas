@@ -229,7 +229,10 @@ async def _fetch_gnews(
                 )
                 src = e.get("source", {})
                 src_name = src.get("title", "Google News") if isinstance(src, dict) else "Google News"
-                text = (e.get("summary") or e.get("title", ""))
+                import re as _re
+                # Google News RSS summaries are raw <a href>…</a> HTML — strip tags
+                raw_summary = _re.sub(r"<[^>]+>", " ", e.get("summary", "")).strip()
+                text = raw_summary or e.get("title", "")
                 results.append(RawResult(
                     id=e.get("id") or e.get("link") or str(uuid.uuid4()),
                     platform=platform,
