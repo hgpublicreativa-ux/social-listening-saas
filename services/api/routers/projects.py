@@ -1,10 +1,20 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from db.connection import get_db
 from models.schemas import ProjectCreate, ProjectOut
 from routers.auth import get_current_user
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    keywords: Optional[list[str]] = None
+    sources: Optional[list[str]] = None
+    language: Optional[str] = None
+    active: Optional[bool] = None
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -41,6 +51,30 @@ async def create_project(
     })
     await db.commit()
     row = result.fetchone()
+    return dict(row._mapping)
+
+
+@router.patch("/{project_id}", response_model=ProjectOut)
+async def update_project(
+    project_id: str,
+    body: ProjectUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    fields = body.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    sets   = ", ".join(f"{k} = :{k}" for k in fields)
+    params = {"id": project_id, **fields}
+    result = await db.execute(text(f"""
+        UPDATE projects SET {sets}
+        WHERE id = :id
+        RETURNING id, name, keywords, sources, language, active, created_at
+    """), params)
+    await db.commit()
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
     return dict(row._mapping)
 
 
