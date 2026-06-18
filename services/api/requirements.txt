@@ -5,6 +5,7 @@ sqlalchemy[asyncio]==2.0.30
 redis[asyncio]==5.0.4
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
 python-dotenv==1.0.1
 pydantic[email]==2.7.1
 structlog==24.1.0
