@@ -313,117 +313,232 @@ export default function SearchPage() {
   const sentPct = s && s.total > 0 ? Math.round(s.positive / s.total * 100) : 0;
   const negPct  = s && s.total > 0 ? Math.round(s.negative / s.total * 100) : 0;
 
-  return (
-    <div className="page-pad">
+  // ── Shared search controls (used both in hero and compact bar) ────────────
+  const searchBar = (heroMode: boolean) => (
+    <div style={{ width: "100%" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+          <input
+            placeholder='"Daniel Noboa", bitcoin, Ecuador elecciones...'
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && go()}
+            style={{
+              width: "100%", paddingLeft: 40, fontSize: heroMode ? 16 : 14,
+              padding: heroMode ? "14px 16px 14px 40px" : "11px 14px 11px 36px",
+              boxShadow: heroMode ? "0 0 0 1px var(--border-soft), 0 8px 32px rgba(0,0,0,.4)" : undefined,
+            }}
+            autoFocus
+          />
+        </div>
+        <button className="btn-primary" onClick={go} disabled={!input.trim() || isFetching}
+          style={{ padding: heroMode ? "14px 32px" : "11px 28px", fontSize: heroMode ? 15 : 14, whiteSpace: "nowrap", fontWeight: 700 }}>
+          {isFetching ? "Analizando…" : "🔍 Buscar"}
+        </button>
+      </div>
 
-      {/* ── Search Bar ────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Búsqueda en Tiempo Real</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>
-          Sentimiento, alcance y engagement al instante desde múltiples fuentes.
-        </p>
-
-        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-            <input
-              placeholder='"Daniel Noboa", bitcoin, Ecuador elecciones...'
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && go()}
-              style={{ width: "100%", paddingLeft: 36, fontSize: 14, padding: "11px 14px 11px 36px" }}
-              autoFocus
-            />
-          </div>
-          <button className="btn-primary" onClick={go} disabled={!input.trim() || isFetching}
-            style={{ padding: "11px 28px", fontSize: 14, whiteSpace: "nowrap", fontWeight: 700 }}>
-            {isFetching ? "Analizando…" : "🔍 Buscar"}
+      {/* Sources */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: heroMode ? 0 : 10 }}>
+        <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Fuentes:</span>
+        {SOURCE_KEYS.map(k => (
+          <button key={k} onClick={() => toggleSrc(k)} style={{
+            background:   sources.includes(k) ? `${PCOLOR[k]}20` : "transparent",
+            color:        sources.includes(k) ? PCOLOR[k] : "var(--text-muted)",
+            border:       `1px solid ${sources.includes(k) ? PCOLOR[k] : "var(--border)"}`,
+            borderRadius: 20, padding: "4px 14px", fontSize: 12, cursor: "pointer",
+            fontWeight:   sources.includes(k) ? 700 : 400,
+            transition:   "all .15s",
+          }}>
+            {PICON[k]} {PLABEL[k]}
           </button>
+        ))}
+        {data && !isFetching && !heroMode && (
+          <button onClick={() => refetch()} style={{
+            marginLeft: "auto", background: "transparent", border: "none",
+            color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12,
+          }}>
+            <RefreshCw size={11} /> Actualizar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const dateControls = (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <Calendar size={13} color="var(--text-muted)" />
+      <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Período:</span>
+      {DATE_PRESETS.map(({ label, days }) => (
+        <button key={days}
+          onClick={() => { setDateDays(days); setDateFrom(""); setDateTo(""); }}
+          disabled={!data}
+          className={dateDays === days && !dateFrom && !dateTo ? "btn-primary" : "btn-ghost"}
+          style={{ padding: "3px 12px", fontSize: 12, opacity: !data ? 0.4 : 1, fontWeight: 600 }}>
+          {label}
+        </button>
+      ))}
+      <span style={{ color: "var(--border-strong)", fontSize: 14, margin: "0 2px" }}>|</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <input type="date" value={dateFrom} disabled={!data}
+          onChange={e => { setDateFrom(e.target.value); setDateDays(0); }}
+          style={{ fontSize: 11, padding: "3px 8px", background: "var(--surface-2)", border: `1px solid ${dateFrom ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, color: "var(--text)", cursor: "pointer", opacity: !data ? 0.4 : 1 }} />
+        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>→</span>
+        <input type="date" value={dateTo} disabled={!data}
+          onChange={e => { setDateTo(e.target.value); setDateDays(0); }}
+          style={{ fontSize: 11, padding: "3px 8px", background: "var(--surface-2)", border: `1px solid ${dateTo ? "var(--accent)" : "var(--border)"}`, borderRadius: 8, color: "var(--text)", cursor: "pointer", opacity: !data ? 0.4 : 1 }} />
+        {(dateFrom || dateTo) && (
+          <button onClick={() => { setDateFrom(""); setDateTo(""); setDateDays(60); }}
+            style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, padding: "0 2px" }}
+            title="Limpiar rango">✕</button>
+        )}
+      </div>
+      {data && (
+        <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
+          · <strong style={{ color: "var(--text)" }}>{all.length}</strong> resultado{all.length !== 1 ? "s" : ""}
+        </span>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+
+    {/* ── HERO (only when no search yet) ────────────────────────────────── */}
+    {!query && !isFetching && (
+      <div style={{ position: "relative", overflow: "hidden", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <style>{`
+          @keyframes orb-float-1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(40px,-30px) scale(1.08)} 66%{transform:translate(-20px,20px) scale(.96)} }
+          @keyframes orb-float-2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-50px,25px) scale(1.05)} 66%{transform:translate(30px,-15px) scale(.98)} }
+          @keyframes orb-float-3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(20px,35px) scale(1.06)} }
+          @keyframes hero-fade-up { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes badge-pulse  { 0%,100%{box-shadow:0 0 0 0 rgba(91,141,239,.4)} 50%{box-shadow:0 0 0 6px rgba(91,141,239,0)} }
+          @keyframes grid-drift   { from{background-position:0 0} to{background-position:40px 40px} }
+          @keyframes ticker-scroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+          .hero-title  { animation: hero-fade-up .7s ease both; }
+          .hero-sub    { animation: hero-fade-up .7s .12s ease both; }
+          .hero-stats  { animation: hero-fade-up .7s .22s ease both; }
+          .hero-search { animation: hero-fade-up .7s .32s ease both; }
+          .hero-chips  { animation: hero-fade-up .7s .42s ease both; }
+          .live-badge  { animation: badge-pulse 2s ease-in-out infinite; }
+        `}</style>
+
+        {/* Animated grid */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          backgroundImage: "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+          opacity: 0.25,
+          animation: "grid-drift 8s linear infinite",
+        }} />
+
+        {/* Orbs */}
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: "8%",  left: "12%",  width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,141,239,.18) 0%, transparent 70%)", animation: "orb-float-1 12s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", top: "45%", right: "8%",  width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,.15) 0%, transparent 70%)", animation: "orb-float-2 15s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", bottom: "10%", left: "35%", width: 360, height: 360, borderRadius: "50%", background: "radial-gradient(circle, rgba(192,132,252,.10) 0%, transparent 70%)", animation: "orb-float-3 10s ease-in-out infinite" }} />
         </div>
 
-        {/* Sources + refresh */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Fuentes:</span>
-          {SOURCE_KEYS.map(k => (
-            <button key={k} onClick={() => toggleSrc(k)} style={{
-              background:   sources.includes(k) ? `${PCOLOR[k]}20` : "transparent",
-              color:        sources.includes(k) ? PCOLOR[k] : "var(--text-muted)",
-              border:       `1px solid ${sources.includes(k) ? PCOLOR[k] : "var(--border)"}`,
-              borderRadius: 20, padding: "4px 14px", fontSize: 12, cursor: "pointer",
-              fontWeight:   sources.includes(k) ? 700 : 400,
-              transition:   "all .15s",
-            }}>
-              {PICON[k]} {PLABEL[k]}
-            </button>
-          ))}
-          {data && !isFetching && (
-            <button onClick={() => refetch()} style={{
-              marginLeft: "auto", background: "transparent", border: "none",
-              color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12,
-            }}>
-              <RefreshCw size={11} /> Actualizar
-            </button>
-          )}
-        </div>
+        {/* Hero content */}
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "40px 24px", maxWidth: 720, width: "100%" }}>
 
-        {/* Date presets + custom range */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <Calendar size={13} color="var(--text-muted)" />
-          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>Período:</span>
-          {DATE_PRESETS.map(({ label, days }) => (
-            <button key={days}
-              onClick={() => { setDateDays(days); setDateFrom(""); setDateTo(""); }}
-              disabled={!data}
-              className={dateDays === days && !dateFrom && !dateTo ? "btn-primary" : "btn-ghost"}
-              style={{ padding: "3px 12px", fontSize: 12, opacity: !data ? 0.4 : 1, fontWeight: 600 }}>
-              {label}
-            </button>
-          ))}
-
-          {/* Divider */}
-          <span style={{ color: "var(--border-strong)", fontSize: 14, margin: "0 2px" }}>|</span>
-
-          {/* Custom date range */}
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <input
-              type="date"
-              value={dateFrom}
-              disabled={!data}
-              onChange={e => { setDateFrom(e.target.value); setDateDays(0); }}
-              style={{
-                fontSize: 11, padding: "3px 8px", background: "var(--surface-2)",
-                border: `1px solid ${dateFrom ? "var(--accent)" : "var(--border)"}`,
-                borderRadius: 8, color: "var(--text)", cursor: "pointer",
-                opacity: !data ? 0.4 : 1,
-              }}
-            />
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>→</span>
-            <input
-              type="date"
-              value={dateTo}
-              disabled={!data}
-              onChange={e => { setDateTo(e.target.value); setDateDays(0); }}
-              style={{
-                fontSize: 11, padding: "3px 8px", background: "var(--surface-2)",
-                border: `1px solid ${dateTo ? "var(--accent)" : "var(--border)"}`,
-                borderRadius: 8, color: "var(--text)", cursor: "pointer",
-                opacity: !data ? 0.4 : 1,
-              }}
-            />
-            {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(""); setDateTo(""); setDateDays(60); }}
-                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, padding: "0 2px" }}
-                title="Limpiar rango">✕</button>
-            )}
+          {/* Live badge */}
+          <div className="live-badge" style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(91,141,239,.12)", border: "1px solid rgba(91,141,239,.35)",
+            borderRadius: 20, padding: "5px 14px", marginBottom: 28, fontSize: 11, fontWeight: 700,
+            color: "var(--accent)", letterSpacing: "0.5px", textTransform: "uppercase",
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3fb950", display: "inline-block", boxShadow: "0 0 6px #3fb950" }} />
+            Análisis en tiempo real · IA activa
           </div>
 
-          {data && (
-            <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>
-              · <strong style={{ color: "var(--text)" }}>{all.length}</strong> resultado{all.length !== 1 ? "s" : ""}
+          {/* Headline */}
+          <h1 className="hero-title" style={{
+            fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 900, lineHeight: 1.1,
+            marginBottom: 16, letterSpacing: "-1px",
+          }}>
+            <span style={{ background: "var(--grad-brand)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Inteligencia de medios
             </span>
-          )}
+            <br />
+            <span style={{ color: "var(--text)" }}>al instante</span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="hero-sub" style={{ fontSize: 16, color: "var(--text-muted)", marginBottom: 36, lineHeight: 1.6, maxWidth: 520, margin: "0 auto 36px" }}>
+            Monitorea <strong style={{ color: "var(--text)" }}>31 medios ecuatorianos</strong>, redes sociales y noticias globales.<br />
+            Sentimiento, alcance y tendencias con GPT-4o-mini.
+          </p>
+
+          {/* Stats strip */}
+          <div className="hero-stats" style={{ display: "flex", gap: 0, justifyContent: "center", marginBottom: 40, borderRadius: 16, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface)" }}>
+            {[
+              { n: "31",     label: "Medios EC" },
+              { n: "5",      label: "Fuentes" },
+              { n: "GPT-4o", label: "Motor IA" },
+              { n: "60d",    label: "Historial" },
+            ].map(({ n, label }, i, arr) => (
+              <div key={label} style={{
+                flex: 1, padding: "18px 12px", textAlign: "center",
+                borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none",
+              }}>
+                <p style={{ fontSize: 22, fontWeight: 900, color: "var(--accent)", lineHeight: 1, marginBottom: 4 }}>{n}</p>
+                <p style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Search bar */}
+          <div className="hero-search" style={{ marginBottom: 20 }}>
+            {searchBar(true)}
+          </div>
+
+          {/* Example chips */}
+          <div className="hero-chips" style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>Prueba:</span>
+            {['"Daniel Noboa"', 'Ecuador economía', 'Quito seguridad', 'Bitcoin'].map(ex => (
+              <button key={ex} onClick={() => { setInput(ex); }}
+                style={{
+                  background: "var(--surface-2)", border: "1px solid var(--border)",
+                  color: "var(--text-muted)", borderRadius: 20, padding: "5px 14px",
+                  fontSize: 12, cursor: "pointer", transition: "all .15s",
+                }}>
+                {ex}
+              </button>
+            ))}
+          </div>
+
+          {/* Feature tags */}
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 40 }}>
+            {[
+              { icon: "⚡", text: "Búsqueda paralela" },
+              { icon: "🧠", text: "Análisis semántico" },
+              { icon: "📊", text: "Sentimiento IA" },
+              { icon: "🇪🇨", text: "Foco Ecuador" },
+              { icon: "🔴", text: "Sin polling" },
+            ].map(({ icon, text }) => (
+              <span key={text} style={{
+                display: "flex", alignItems: "center", gap: 5,
+                fontSize: 11, color: "var(--text-dim)",
+                background: "var(--surface)", border: "1px solid var(--border)",
+                borderRadius: 8, padding: "4px 10px",
+              }}>{icon} {text}</span>
+            ))}
+          </div>
         </div>
       </div>
+    )}
+
+    {/* ── Compact header (after search) ────────────────────────────────── */}
+    {(query || isFetching) && (
+      <div className="page-pad" style={{ paddingBottom: 0 }}>
+        <div style={{ marginBottom: 16 }}>
+          {searchBar(false)}
+          <div style={{ marginTop: 10 }}>{dateControls}</div>
+        </div>
+      </div>
+    )}
 
       {/* ── Loading ───────────────────────────────────────────────────────── */}
       {isFetching && (
@@ -460,32 +575,16 @@ export default function SearchPage() {
       )}
 
       {isError && !isFetching && (
-        <div className="card" style={{ textAlign: "center", padding: 40, color: "#f85149" }}>
+        <div className="card" style={{ textAlign: "center", padding: 40, color: "#f85149", margin: "0 24px" }}>
           <p style={{ fontSize: 32, marginBottom: 12 }}>⚠️</p>
           <p style={{ fontWeight: 700, fontSize: 15 }}>Error al conectar con el servidor</p>
           <p style={{ fontSize: 13, marginTop: 6 }}>Revisa tu conexión e intenta de nuevo.</p>
         </div>
       )}
 
-      {!query && !isFetching && (
-        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-muted)" }}>
-          <p style={{ fontSize: 52, marginBottom: 16 }}>🔎</p>
-          <p style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: "var(--text)" }}>Escribe cualquier keyword</p>
-          <p style={{ fontSize: 13, marginBottom: 24 }}>Análisis completo con IA en ~5 segundos</p>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            {['"Daniel Noboa"', 'Ecuador economía', 'Quito seguridad', 'Bitcoin'].map(ex => (
-              <button key={ex} onClick={() => { setInput(ex); }}
-                style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-muted)", borderRadius: 20, padding: "6px 16px", fontSize: 12, cursor: "pointer" }}>
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── Results ───────────────────────────────────────────────────────── */}
       {!isFetching && data && s && (
-        <>
+        <div className="page-pad" style={{ paddingTop: 0 }}>
           {/* KPI Row */}
           <div className="kpi-grid" style={{ marginBottom: 24 }}>
             <KpiCard icon={<BarChart2 size={18} />}  label="Menciones"   value={s.total}       color="var(--accent)"  sub={`"${data.query}"`} />
@@ -638,7 +737,7 @@ export default function SearchPage() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
