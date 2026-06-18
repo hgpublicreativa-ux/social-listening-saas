@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProjects, createProject } from "../api/client";
+import { getProjects, createProject, deleteProject } from "../api/client";
 import { Plus, Trash2, Radio } from "lucide-react";
 
 interface Props { onSelect: (id: string, name: string) => void }
@@ -26,6 +26,18 @@ export default function ProjectsPage({ onSelect }: Props) {
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["projects"] }); setShowForm(false); },
   });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteProject(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+
+  const handleDelete = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    if (window.confirm(`¿Eliminar el proyecto "${name}"? Esta acción no se puede deshacer.`)) {
+      remove.mutate(id);
+    }
+  };
 
   const toggleSource = (s: string) => {
     setForm((prev) => ({
@@ -101,7 +113,23 @@ export default function ProjectsPage({ onSelect }: Props) {
                   ))}
                 </div>
               </div>
-              <span style={{ color: "var(--accent)", fontSize: 12 }}>Ver dashboard →</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <span style={{ color: "var(--accent)", fontSize: 12 }}>Ver dashboard →</span>
+                <button
+                  onClick={(e) => handleDelete(e, p.id, p.name)}
+                  disabled={remove.isPending}
+                  title="Eliminar proyecto"
+                  style={{
+                    background: "transparent", border: "1px solid var(--border)",
+                    borderRadius: 6, padding: "6px 8px", cursor: "pointer",
+                    color: "#8b949e", display: "flex", alignItems: "center",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#f85149"; e.currentTarget.style.color = "#f85149"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "#8b949e"; }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           </div>
         ))}
