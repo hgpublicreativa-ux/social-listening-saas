@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nlp-worker
+  namespace: social-listening
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nlp-worker
+  template:
+    metadata:
+      labels:
+        app: nlp-worker
+    spec:
+      containers:
+        - name: nlp-worker
+          image: social-listening/nlp-worker:latest
+          envFrom:
+            - secretRef:
+                name: social-listening-secrets
+          resources:
+            requests: { cpu: "500m",  memory: "1Gi" }
+            limits:   { cpu: "2000m", memory: "4Gi" }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nlp-worker-hpa
+  namespace: social-listening
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nlp-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
