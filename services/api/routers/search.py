@@ -169,7 +169,7 @@ async def _fetch_gnews(client: httpx.AsyncClient, q: str) -> list[RawResult]:
         )
         feed = feedparser.parse(r.text)
         results = []
-        for e in feed.entries[:20]:
+        for e in feed.entries[:12]:
             try:
                 pub = (
                     datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
@@ -238,7 +238,7 @@ async def _fetch_media(client: httpx.AsyncClient, q: str) -> list[RawResult]:
             )
             feed = feedparser.parse(r.text)
             out  = []
-            for e in feed.entries[:15]:
+            for e in feed.entries[:8]:
                 try:
                     pub = (
                         datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()

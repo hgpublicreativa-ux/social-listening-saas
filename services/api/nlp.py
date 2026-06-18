@@ -1,4 +1,5 @@
 """Lightweight NLP batch processor for on-demand search enrichment."""
+import asyncio
 import hashlib
 import json
 import logging
@@ -59,8 +60,7 @@ async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
         else:
             uncached.append(item)
 
-    for i in range(0, len(uncached), 8):   # smaller batches → no truncation
-        batch = uncached[i:i + 8]
+    async def _process_batch(batch: list[dict]) -> None:
         payload = [{"id": x["id"], "text": x["text"][:300]} for x in batch]
         try:
             resp = await _client.chat.completions.create(
@@ -72,7 +72,6 @@ async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
                 )}],
             )
             content = resp.choices[0].message.content or ""
-            # Strip markdown code fences if present
             content = content.strip()
             if content.startswith("```"):
                 content = content.split("```")[1]
@@ -93,6 +92,9 @@ async def enrich_batch(redis: Redis, items: list[dict]) -> dict[str, dict]:
             log.error("GPT batch failed: %s", exc)
             for item in batch:
                 results[item["id"]] = _fallback(item["id"], item["text"])
+
+    batches = [uncached[i:i + 8] for i in range(0, len(uncached), 8)]
+    await asyncio.gather(*[_process_batch(b) for b in batches])
 
     # Fallback for any missing
     for item in items:
