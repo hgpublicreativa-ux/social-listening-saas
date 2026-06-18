@@ -1,4 +1,6 @@
+import os
 import asyncio
+import base64
 import logging
 from datetime import datetime, timezone
 
@@ -11,10 +13,14 @@ from utils.normalizer import make_envelope
 
 log = logging.getLogger("ingestion.reddit")
 
-# Reddit's public JSON search — no auth required for read-only public listings.
-SEARCH_URL   = "https://www.reddit.com/search.json"
-POLL_SECONDS = 300  # 5 minutes
-HEADERS      = {"User-Agent": "SocialListenerBot/1.0 (by /u/sociallistener)"}
+# Reddit's public JSON endpoint now 403s datacenter IPs, so we use the free
+# OAuth app-only flow (register a "web app" at reddit.com/prefs/apps).
+CLIENT_ID     = os.getenv("REDDIT_CLIENT_ID", "")
+CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
+TOKEN_URL     = "https://www.reddit.com/api/v1/access_token"
+SEARCH_URL    = "https://oauth.reddit.com/search"
+POLL_SECONDS  = 300  # 5 minutes
+USER_AGENT    = "SocialListenerBot/1.0 by social-listening-saas"
 
 
 class RedditConnector:
@@ -23,21 +29,44 @@ class RedditConnector:
         self.redis      = redis
         self.project_id = project_id
         self.keywords   = keywords
+        self._token     = None
+        self._token_exp = 0.0
+
+    async def _get_token(self, client: httpx.AsyncClient) -> str | None:
+        now = asyncio.get_event_loop().time()
+        if self._token and now < self._token_exp - 60:
+            return self._token
+
+        basic = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
+        r = await client.post(
+            TOKEN_URL,
+            data={"grant_type": "client_credentials"},
+            headers={"Authorization": f"Basic {basic}", "User-Agent": USER_AGENT},
+        )
+        r.raise_for_status()
+        data = r.json()
+        self._token     = data["access_token"]
+        self._token_exp = now + data.get("expires_in", 3600)
+        return self._token
 
     async def _fetch(self, client: httpx.AsyncClient, keyword: str) -> list[dict]:
-        r = await client.get(SEARCH_URL, params={
-            "q":     keyword,
-            "sort":  "new",
-            "limit": 50,
-            "t":     "week",
-        })
+        token = await self._get_token(client)
+        r = await client.get(
+            SEARCH_URL,
+            params={"q": keyword, "sort": "new", "limit": 50, "t": "week"},
+            headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT},
+        )
         r.raise_for_status()
         children = r.json().get("data", {}).get("children", [])
         return [c.get("data", {}) for c in children]
 
     async def run(self):
+        if not CLIENT_ID or not CLIENT_SECRET:
+            log.warning("REDDIT_CLIENT_ID/SECRET not set — skipping Reddit connector")
+            return
+
         log.info("Reddit connector started, polling every %ds", POLL_SECONDS)
-        async with httpx.AsyncClient(timeout=30, headers=HEADERS, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             while True:
                 for keyword in self.keywords:
                     try:
@@ -97,6 +126,10 @@ class RedditConnector:
                         log.info("Reddit [%s]: %d new posts", keyword, new_count)
 
                     except httpx.HTTPStatusError as exc:
+                        code = exc.response.status_code
+                        if code in (401, 403):
+                            log.error("Reddit auth failed (HTTP %d) — check REDDIT_CLIENT_ID/SECRET", code)
+                            return
                         log.warning("Reddit API error for [%s]: %s", keyword, exc)
                     except Exception as exc:
                         log.warning("Reddit error for [%s]: %s", keyword, exc)

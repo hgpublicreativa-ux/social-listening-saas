@@ -93,8 +93,7 @@ async def run():
                 running_tasks.append(asyncio.create_task(
                     WebScraperConnector(producer, redis, pid, keywords).run()
                 ))
-            # Reddit needs no API key — always available when requested or by default
-            if "reddit" in sources or "web" in sources:
+            if ("reddit" in sources or "web" in sources) and os.getenv("REDDIT_CLIENT_ID"):
                 running_tasks.append(asyncio.create_task(
                     RedditConnector(producer, redis, pid, keywords).run()
                 ))
