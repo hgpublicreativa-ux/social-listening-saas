@@ -1,16 +1,14 @@
 -- Railway-compatible migration: works with standard PostgreSQL (no TimescaleDB required)
--- Run AFTER 001_initial.sql only if TimescaleDB is NOT available
+-- Idempotent: safe to re-run on every API startup WITHOUT destroying existing data.
 
 DO $$
 BEGIN
-  -- Check if TimescaleDB is installed; if not, create metrics_hourly as plain table
+  -- Only build plain tables when TimescaleDB is NOT available.
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
 
-    -- Drop hypertable if partially created
-    DROP TABLE IF EXISTS metrics_hourly CASCADE;
-    DROP MATERIALIZED VIEW IF EXISTS metrics_daily;
-
-    CREATE TABLE metrics_hourly (
+    -- NOTE: never DROP metrics_hourly here — run_migrations executes this file
+    -- on every API boot, so a DROP would wipe all accumulated metrics each deploy.
+    CREATE TABLE IF NOT EXISTS metrics_hourly (
         bucket              TIMESTAMPTZ NOT NULL,
         project_id          UUID NOT NULL,
         platform            TEXT NOT NULL,
@@ -24,8 +22,8 @@ BEGIN
         PRIMARY KEY (bucket, project_id, platform)
     );
 
-    CREATE INDEX idx_metrics_project_bucket ON metrics_hourly(project_id, bucket DESC);
-    CREATE INDEX idx_metrics_platform_bucket ON metrics_hourly(platform, bucket DESC);
+    CREATE INDEX IF NOT EXISTS idx_metrics_project_bucket  ON metrics_hourly(project_id, bucket DESC);
+    CREATE INDEX IF NOT EXISTS idx_metrics_platform_bucket ON metrics_hourly(platform, bucket DESC);
 
     -- Simple daily view (no continuous aggregate needed)
     CREATE OR REPLACE VIEW metrics_daily AS
