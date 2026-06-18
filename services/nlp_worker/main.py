@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime
 
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -49,6 +50,18 @@ async def upsert_profile(session: AsyncSession, author: dict, platform: str) -> 
     return str(row[0]) if row else None
 
 
+def _parse_dt(value):
+    """asyncpg needs datetime objects, not ISO strings."""
+    if value is None:
+        return datetime.utcnow()
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return datetime.utcnow()
+
+
 async def save_mention(session: AsyncSession, mention: dict, nlp: dict, profile_id: str | None):
     await session.execute(text("""
         INSERT INTO mentions(
@@ -72,7 +85,7 @@ async def save_mention(session: AsyncSession, mention: dict, nlp: dict, profile_
         "text":            mention.get("content_text"),
         "url":             mention.get("content_url"),
         "lang":            mention.get("language", "es"),
-        "published_at":    mention.get("published_at"),
+        "published_at":    _parse_dt(mention.get("published_at")),
         "sentiment":       nlp.get("sentiment"),
         "sentiment_score": nlp.get("sentiment_score"),
         "keywords":        nlp.get("keywords", []),
