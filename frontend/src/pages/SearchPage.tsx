@@ -147,7 +147,7 @@ function ResultCard({ r }: { r: EnrichedResult }) {
 export default function SearchPage() {
   const [input,      setInput]      = useState("");
   const [query,      setQuery]      = useState("");
-  const [sources,    setSources]    = useState<string[]>(["twitter", "web", "gnews_ec", "bluesky", "media"]);
+  const [sources,    setSources]    = useState<string[]>(["gnews_ec", "media"]);
   const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "bluesky" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
   const [dateDays,   setDateDays]   = useState(60);
