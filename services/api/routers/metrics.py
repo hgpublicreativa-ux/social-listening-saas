@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -22,7 +23,7 @@ async def timeseries(
     table = "metrics_daily" if granularity == "day" else "metrics_hourly"
     col   = "day" if granularity == "day" else "bucket"
     clauses = ["project_id = :pid", f"{col} >= :from_date", f"{col} <= :to_date"]
-    params  = {"pid": project_id, "from_date": from_date, "to_date": to_date}
+    params  = {"pid": project_id, "from_date": datetime.fromisoformat(from_date), "to_date": datetime.fromisoformat(to_date)}
 
     if platform:
         clauses.append("platform = :platform")
@@ -61,7 +62,7 @@ async def summary(
           AND bucket >= :from_date
           AND bucket <= :to_date
         GROUP BY platform
-    """), {"pid": project_id, "from_date": from_date, "to_date": to_date})
+    """), {"pid": project_id, "from_date": datetime.fromisoformat(from_date), "to_date": datetime.fromisoformat(to_date)})
     return [dict(r._mapping) for r in result.fetchall()]
 
 
