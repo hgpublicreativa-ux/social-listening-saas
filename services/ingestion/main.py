@@ -27,6 +27,11 @@ REDIS_URL    = os.getenv("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
 PROJECT_REFRESH_SECONDS = 300  # re-read projects from DB every 5 min
 
+# On-demand mode: when false (default), NO background connector polls on a timer.
+# Everything runs only when the user hits the /search API. Set BACKGROUND_POLLING=true
+# on Railway to re-enable continuous background ingestion for saved projects.
+BACKGROUND_POLLING = os.getenv("BACKGROUND_POLLING", "false").lower() == "true"
+
 shutdown_event = asyncio.Event()
 
 
@@ -65,6 +70,16 @@ async def run():
     producer = StreamProducer(redis)
     await producer.start()
     log.info("Ingestion service started — using Redis Streams")
+
+    # On-demand mode: skip all background polling. The /search API handles
+    # everything live; saved-project dashboards stay static until BACKGROUND_POLLING=true.
+    if not BACKGROUND_POLLING:
+        log.info("On-demand mode (BACKGROUND_POLLING=false) — no connectors will poll. Idle until shutdown.")
+        await shutdown_event.wait()
+        await producer.stop()
+        await redis.aclose()
+        log.info("Ingestion stopped cleanly")
+        return
 
     running_tasks: list[asyncio.Task] = []
 
