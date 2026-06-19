@@ -519,9 +519,10 @@ async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 
 @router.get("", response_model=SearchResponse)
 async def live_search(
-    q:       str = Query(..., min_length=1),
-    sources: str = Query("twitter,web,media"),
-    _user =  Depends(get_current_user),
+    q:         str = Query(..., min_length=1),
+    sources:   str = Query("twitter,web,media"),
+    date_from: str = Query(None, description="ISO date YYYY-MM-DD — overrides 60d default cutoff"),
+    _user =    Depends(get_current_user),
 ):
     # Parse category filter from query: "categoria: XXX" (accent-insensitive)
     category = None
@@ -556,8 +557,14 @@ async def live_search(
             fetched_batches = await asyncio.gather(*tasks)
 
         raw: list[RawResult] = [r for batch in fetched_batches for r in batch]
-        # Limit to last 60 days
-        cutoff_60d = datetime.now(timezone.utc) - timedelta(days=60)
+        # Date cutoff: use date_from if provided, else default 60 days
+        if date_from:
+            try:
+                cutoff_60d = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+            except Exception:
+                cutoff_60d = datetime.now(timezone.utc) - timedelta(days=60)
+        else:
+            cutoff_60d = datetime.now(timezone.utc) - timedelta(days=60)
         def _within_60d(r: RawResult) -> bool:
             try:
                 dt = datetime.fromisoformat(r.published_at.replace("Z", "+00:00"))

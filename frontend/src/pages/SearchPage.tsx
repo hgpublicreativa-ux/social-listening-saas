@@ -40,8 +40,8 @@ const SOURCE_KEYS = ["twitter", "web", "reddit", "gnews_ec", "media"] as const;
 const DATE_PRESETS = [{ label: "7d", days: 7 }, { label: "14d", days: 14 }, { label: "30d", days: 30 }, { label: "60d", days: 60 }];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const doSearch = (q: string, sources: string[]): Promise<SearchResponse> =>
-  api.get("/search", { params: { q, sources: sources.join(",") } }).then(r => r.data);
+const doSearch = (q: string, sources: string[], dateFrom?: string): Promise<SearchResponse> =>
+  api.get("/search", { params: { q, sources: sources.join(","), ...(dateFrom ? { date_from: dateFrom } : {}) } }).then(r => r.data);
 
 function filterByRange(
   results: EnrichedResult[],
@@ -280,8 +280,8 @@ export default function SearchPage() {
   const [dateTo,     setDateTo]     = useState("");
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
-    queryKey:  ["live-search", query, sources.join(",")],
-    queryFn:   () => doSearch(query, sources),
+    queryKey:  ["live-search", query, sources.join(","), dateFrom],
+    queryFn:   () => doSearch(query, sources, dateFrom || undefined),
     enabled:   !!query,
     staleTime: 120_000,
     retry:     1,
