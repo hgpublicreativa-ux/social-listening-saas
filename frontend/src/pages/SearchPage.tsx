@@ -272,6 +272,7 @@ function ResultCard({ r }: { r: EnrichedResult }) {
 export default function SearchPage() {
   const [input,      setInput]      = useState("");
   const [query,      setQuery]      = useState("");
+  const isAccountSearch = /^@[\w]+$/.test(query.trim());
   const [sources,    setSources]    = useState<string[]>(["gnews_ec", "media"]);
   const [tab,        setTab]        = useState<"all" | "twitter" | "web" | "gnews_ec" | "reddit" | "media">("all");
   const [sentFilter, setSentFilter] = useState("");
@@ -334,7 +335,7 @@ export default function SearchPage() {
         <div style={{ position: "relative", flex: 1 }}>
           <Search size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
           <input
-            placeholder='"Daniel Noboa", bitcoin, Ecuador elecciones...'
+            placeholder='"Daniel Noboa", bitcoin, @cuenta, Ecuador elecciones...'
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && go()}
@@ -533,6 +534,16 @@ export default function SearchPage() {
       <div className="page-pad" style={{ paddingBottom: 0 }}>
         <div style={{ marginBottom: 16 }}>
           {searchBar(false)}
+          {isAccountSearch && (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8,
+              background: "rgba(91,157,240,.12)", border: "1px solid rgba(91,157,240,.3)",
+              borderRadius: 20, padding: "4px 12px", fontSize: 12, color: "#5b9df0",
+            }}>
+              <span style={{ fontWeight: 700 }}>𝕏</span>
+              <span>Buscando cuenta <strong>{query.trim()}</strong> — Twitter usa <code>from:{query.trim().replace("@","")}</code></span>
+            </div>
+          )}
           <div style={{ marginTop: 10 }}>{dateControls}</div>
         </div>
       </div>

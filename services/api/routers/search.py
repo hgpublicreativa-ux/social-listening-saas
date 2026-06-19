@@ -524,6 +524,11 @@ async def live_search(
     date_from: str = Query(None, description="ISO date YYYY-MM-DD — overrides 60d default cutoff"),
     _user =    Depends(get_current_user),
 ):
+    # Detect @account search
+    import re as _re2
+    account_match = _re2.match(r'^@([\w]+)$', q.strip())
+    account_handle = account_match.group(1) if account_match else None
+
     # Parse category filter from query: "categoria: XXX" (accent-insensitive)
     category = None
     query_for_search = q
@@ -531,12 +536,11 @@ async def live_search(
     if "categoria:" in q_norm:
         parts = q_norm.split("categoria:", 1)
         category = parts[1].strip().split()[0] if len(parts) > 1 else None
-        # Preserve original query text minus the categoria clause
         orig_lower = q.lower()
         cat_idx = orig_lower.find("categoria:")
         query_for_search = q[:cat_idx].strip() if cat_idx > 0 else ""
         if not query_for_search:
-            query_for_search = category  # fall back to category as search term
+            query_for_search = category
 
     src_list = [s.strip() for s in sources.split(",")]
     redis    = Redis.from_url(REDIS_URL, decode_responses=True)
@@ -545,15 +549,19 @@ async def live_search(
         async with httpx.AsyncClient(follow_redirects=True) as client:
             tasks = []
             if "twitter" in src_list:
-                tasks.append(_fetch_twitter(client, query_for_search))
+                # @account → use from:handle operator for precise account timeline
+                twitter_q = f"from:{account_handle}" if account_handle else query_for_search
+                tasks.append(_fetch_twitter(client, twitter_q))
+            # For non-Twitter sources, search by handle name (without @)
+            non_twitter_q = account_handle if account_handle else query_for_search
             if "web" in src_list:
-                tasks.append(_fetch_gnews(client, query_for_search, platform="web", worldwide=True, limit=60))
+                tasks.append(_fetch_gnews(client, non_twitter_q, platform="web", worldwide=True, limit=60))
             if "gnews_ec" in src_list:
-                tasks.append(_fetch_gnews(client, query_for_search, platform="gnews_ec", ec_only=True, limit=60))
+                tasks.append(_fetch_gnews(client, non_twitter_q, platform="gnews_ec", ec_only=True, limit=60))
             if "reddit" in src_list:
-                tasks.append(_fetch_reddit(client, query_for_search))
+                tasks.append(_fetch_reddit(client, non_twitter_q))
             if "media" in src_list:
-                tasks.append(_fetch_media(client, query_for_search))
+                tasks.append(_fetch_media(client, non_twitter_q))
             fetched_batches = await asyncio.gather(*tasks)
 
         raw: list[RawResult] = [r for batch in fetched_batches for r in batch]
