@@ -1,16 +1,22 @@
 import React, { useMemo } from "react";
-import { TrendingUp, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 
 interface Props {
-  results: Array<{ keywords: string[] }>;
+  results: Array<{ keywords: string[]; platform: string }>;
   onTrendingClick?: (keyword: string) => void;
+  region?: "ecuador" | "all";
 }
 
-export default function TrendingWidget({ results, onTrendingClick }: Props) {
+export default function TrendingWidget({ results, onTrendingClick, region = "ecuador" }: Props) {
   const trending = useMemo(() => {
     const freq: Record<string, number> = {};
 
-    results.forEach(r => {
+    // Filter by region
+    const filtered = region === "ecuador"
+      ? results.filter(r => r.platform === "gnews_ec" || r.platform === "media")
+      : results;
+
+    filtered.forEach(r => {
       r.keywords?.forEach(kw => {
         freq[kw] = (freq[kw] || 0) + 1;
       });
@@ -20,7 +26,7 @@ export default function TrendingWidget({ results, onTrendingClick }: Props) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([kw, count]) => ({ kw, count }));
-  }, [results]);
+  }, [results, region]);
 
   if (trending.length === 0) return null;
 
@@ -31,7 +37,7 @@ export default function TrendingWidget({ results, onTrendingClick }: Props) {
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
         <Zap size={14} color="var(--accent)" />
         <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
-          Trending now
+          Trending {region === "ecuador" && "🇪🇨 Ecuador"}
         </span>
       </div>
 
