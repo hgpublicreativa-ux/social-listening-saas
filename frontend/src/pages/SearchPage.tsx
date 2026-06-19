@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { formatDistanceToNow, parseISO, subDays, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { Search, ExternalLink, RefreshCw, Users, TrendingUp, Calendar, MessageCircle, Heart, Repeat2, Eye, Zap, Globe, BarChart2 } from "lucide-react";
+import TrendingWidget from "../components/TrendingWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface EnrichedResult {
@@ -740,6 +741,22 @@ export default function SearchPage() {
                   );
                 })}
               </div>
+
+              {/* Trending keywords */}
+              {all.length > 0 && (
+                <TrendingWidget
+                  results={all}
+                  onTrendingClick={(kw) => {
+                    setInput(kw);
+                    setQuery(kw);
+                    setSentFilter("");
+                    setDateDays(60);
+                    setDateFrom("");
+                    setDateTo("");
+                    setTab("all");
+                  }}
+                />
+              )}
 
               {/* Top accounts */}
               {data.top_accounts.length > 0 && (
