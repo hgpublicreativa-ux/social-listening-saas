@@ -455,6 +455,57 @@ export default function SearchPage() {
           <div style={{ position: "absolute", bottom: "10%", left: "35%", width: 360, height: 360, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,157,240,.08) 0%, transparent 70%)", animation: "orb-float-3 10s ease-in-out infinite" }} />
         </div>
 
+        {/* Scrolling tickers — news row + twitter row */}
+        {(() => {
+          const news = [
+            "📰 Asamblea Nacional aprueba nuevo presupuesto general del Estado",
+            "📰 Precio del petróleo sube 3% tras tensiones en Medio Oriente",
+            "📰 Ecuador registra record de exportaciones no petroleras en mayo",
+            "📰 Gobierno anuncia plan de seguridad para frontera norte",
+            "📰 Banco Central eleva proyección de crecimiento al 2.4%",
+            "📰 Quito: nuevas obras viales en el sur de la ciudad",
+            "📰 Primicias: ministro de economía presenta reforma tributaria",
+            "📰 El Universo: temporada de lluvias afecta cultivos en Manabí",
+          ];
+          const tweets = [
+            "𝕏 @danielnoboa · Trabajando por un Ecuador más seguro para todos 🇪🇨",
+            "𝕏 @eluniversocom · ÚLTIMA HORA: Sesión extraordinaria de la Asamblea convocada",
+            "𝕏 @ecuavisa · EN VIVO: Rueda de prensa del Ministerio de Interior",
+            "𝕏 @primicias_ec · Análisis: Los 5 puntos clave del acuerdo con el FMI",
+            "𝕏 @teleamazonasec · Lluvias intensas en Guayas: se activa alerta naranja",
+            "𝕏 @lapostaec · Investigación especial: contratos del Estado bajo la lupa",
+            "𝕏 @expreso_ec · Quito supera los 3 millones de habitantes según censo",
+          ];
+          const tickerRow = (items: string[], duration: string, dir: "normal" | "reverse", top: string, color: string) => {
+            const doubled = [...items, ...items];
+            return (
+              <div style={{
+                position: "absolute", top, left: 0, right: 0,
+                overflow: "hidden", pointerEvents: "none",
+                maskImage: "linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)",
+                WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)",
+              }}>
+                <div style={{
+                  display: "flex", gap: 48, whiteSpace: "nowrap",
+                  animation: `ticker-scroll ${duration} linear infinite`,
+                  animationDirection: dir,
+                  opacity: 0.13,
+                }}>
+                  {doubled.map((item, i) => (
+                    <span key={i} style={{ fontSize: 12, fontWeight: 600, color, flexShrink: 0 }}>{item}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          };
+          return (
+            <>
+              {tickerRow(news,   "38s", "normal",  "12%", "#f5a623")}
+              {tickerRow(tweets, "28s", "reverse", "88%", "#5b9df0")}
+            </>
+          );
+        })()}
+
         {/* Hero content */}
         <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "40px 24px", maxWidth: 720, width: "100%" }}>
 
