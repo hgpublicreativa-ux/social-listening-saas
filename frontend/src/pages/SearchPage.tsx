@@ -427,6 +427,8 @@ export default function SearchPage() {
           @keyframes orb-float-3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(20px,35px) scale(1.06)} }
           @keyframes hero-fade-up { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
           @keyframes badge-pulse  { 0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,.4)} 50%{box-shadow:0 0 0 6px rgba(245,166,35,0)} }
+          @keyframes live-dot     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
+          @keyframes live-ring    { 0%{transform:scale(1);opacity:.8} 100%{transform:scale(2.8);opacity:0} }
           @keyframes grid-drift   { from{background-position:0 0} to{background-position:40px 40px} }
           @keyframes ticker-scroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
           .hero-title  { animation: hero-fade-up .7s ease both; }
@@ -465,12 +467,17 @@ export default function SearchPage() {
 
           {/* Live badge */}
           <div className="live-badge" style={{
-            display: "inline-flex", alignItems: "center", gap: 7,
+            display: "inline-flex", alignItems: "center", gap: 10,
             background: "rgba(245,166,35,.10)", border: "1px solid rgba(245,166,35,.32)",
             borderRadius: 20, padding: "5px 14px", marginBottom: 26, fontSize: 11, fontWeight: 700,
             color: "var(--accent)", letterSpacing: "0.06em", textTransform: "uppercase",
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)", display: "inline-block", boxShadow: "0 0 7px var(--green)" }} />
+            {/* Broadcast-style live dot with ripple rings */}
+            <span style={{ position: "relative", width: 12, height: 12, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #ef4444", animation: "live-ring 1.4s ease-out infinite" }} />
+              <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #ef4444", animation: "live-ring 1.4s ease-out .5s infinite" }} />
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", display: "block", animation: "live-dot 1.4s ease-in-out infinite", boxShadow: "0 0 6px #ef4444, 0 0 12px rgba(239,68,68,.5)" }} />
+            </span>
             En tiempo real · IA activa
           </div>
 
