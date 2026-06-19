@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Activity } from "lucide-react";
 import { login } from "../api/client";
 
 export default function Login() {
@@ -27,28 +28,24 @@ export default function Login() {
   return (
     <div style={{
       minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 20,
+      padding: 20, position: "relative", overflow: "hidden",
     }}>
-      <div className="fade-up" style={{ width: 380, maxWidth: "100%" }}>
+      {/* ambient glow */}
+      <div style={{ position: "absolute", top: "-10%", right: "-5%", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,166,35,.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div className="fade-up" style={{ width: 388, maxWidth: "100%", position: "relative", zIndex: 1 }}>
         {/* Brand */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{
-            width: 56, height: 56, margin: "0 auto 16px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            borderRadius: 16,
-            background: "var(--grad-brand)",
-            boxShadow: "0 8px 28px var(--accent-glow)",
-            fontSize: 26,
-          }}>📡</div>
-          <h1 style={{
-            fontSize: 26, fontWeight: 800,
-            background: "var(--grad-brand)", WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent", backgroundClip: "text",
-          }}>Social Listening</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>Monitoreo de tendencias en tiempo real</p>
+          <div className="brand-mark" style={{ width: 58, height: 58, margin: "0 auto 16px", borderRadius: 17 }}>
+            <Activity size={28} strokeWidth={2.6} />
+          </div>
+          <h1 style={{ fontSize: 30, fontWeight: 900, letterSpacing: "0.02em" }}>
+            <span className="gradient-text">PULSO</span>
+          </h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 6 }}>Inteligencia de medios en tiempo real</p>
         </div>
 
-        <div className="card" style={{ padding: "26px 24px", boxShadow: "var(--shadow-lg)" }}>
+        <div className="card" style={{ padding: "28px 26px", boxShadow: "var(--shadow-lg)" }}>
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 6, fontWeight: 600 }}>Email</label>
@@ -59,7 +56,7 @@ export default function Login() {
               <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} style={{ width: "100%", padding: "11px 13px" }} required />
             </div>
             {err && (
-              <p style={{ color: "var(--red)", fontSize: 12, background: "rgba(248,81,73,.1)", padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(248,81,73,.2)" }}>
+              <p style={{ color: "var(--red)", fontSize: 12, background: "rgba(248,113,113,.1)", padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(248,113,113,.2)" }}>
                 ⚠ {err}
               </p>
             )}
@@ -69,7 +66,7 @@ export default function Login() {
           </form>
           <p style={{ marginTop: 18, textAlign: "center", fontSize: 12, color: "var(--text-muted)" }}>
             ¿Sin cuenta?{" "}
-            <a href="/register" style={{ color: "var(--accent)", fontWeight: 600 }}>Registrarse</a>
+            <a href="/register" style={{ color: "var(--accent)", fontWeight: 700 }}>Registrarse</a>
           </p>
         </div>
       </div>

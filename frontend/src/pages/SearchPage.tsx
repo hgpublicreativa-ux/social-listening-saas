@@ -27,11 +27,11 @@ interface SearchResponse {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PICON: Record<string, string>  = { twitter: "𝕏", web: "📰", reddit: "🟠", media: "📺", gnews_ec: "🇪🇨" };
-const PCOLOR: Record<string, string> = { twitter: "#1d9bf0", web: "#58a6ff", reddit: "#ff4500", media: "#e3a000", gnews_ec: "#34a853" };
+const PCOLOR: Record<string, string> = { twitter: "#5b9df0", web: "#7aa2ff", reddit: "#ff6a3d", media: "#f5a623", gnews_ec: "#34d399" };
 const PLABEL: Record<string, string> = { twitter: "X / Twitter", web: "Google News", reddit: "Reddit", media: "Medios monitoreados", gnews_ec: "Noticias Ecuador" };
 
-const SENT_COLOR: Record<string, string> = { positive: "#3fb950", negative: "#f85149", neutral: "#8b949e" };
-const SENT_BG: Record<string, string>    = { positive: "rgba(63,185,80,.15)", negative: "rgba(248,81,73,.15)", neutral: "rgba(139,148,158,.12)" };
+const SENT_COLOR: Record<string, string> = { positive: "#34d399", negative: "#f87171", neutral: "#9aa1b0" };
+const SENT_BG: Record<string, string>    = { positive: "rgba(52,211,153,.15)", negative: "rgba(248,113,113,.15)", neutral: "rgba(154,161,176,.12)" };
 const SENT_LABEL: Record<string, string> = { positive: "Positivo", negative: "Negativo", neutral: "Neutral" };
 const SENT_EMOJI: Record<string, string> = { positive: "😊", negative: "😠", neutral: "😐" };
 
@@ -109,22 +109,23 @@ function DonutChart({ pos, neg, neu, total }: { pos: number; neg: number; neu: n
   const nPct = Math.round(neg / total * 100);
   const uPct = 100 - pPct - nPct;
   const gradient = `conic-gradient(
-    #3fb950 0% ${pPct}%,
-    #f85149 ${pPct}% ${pPct + nPct}%,
-    #8b949e ${pPct + nPct}% 100%
+    #34d399 0% ${pPct}%,
+    #f87171 ${pPct}% ${pPct + nPct}%,
+    #9aa1b0 ${pPct + nPct}% 100%
   )`;
   return (
-    <div style={{ position: "relative", width: 110, height: 110, margin: "0 auto" }}>
-      <div style={{ width: 110, height: 110, borderRadius: "50%", background: gradient }} />
+    <div style={{ position: "relative", width: 120, height: 120, margin: "0 auto" }}>
+      <div style={{ width: 120, height: 120, borderRadius: "50%", background: gradient, boxShadow: "0 6px 22px rgba(0,0,0,.4)" }} />
       {/* hole */}
       <div style={{
         position: "absolute", top: "50%", left: "50%",
         transform: "translate(-50%,-50%)",
-        width: 62, height: 62, borderRadius: "50%",
-        background: "var(--card)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        width: 70, height: 70, borderRadius: "50%",
+        background: "var(--surface)", border: "1px solid var(--border)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       }}>
-        <span style={{ fontSize: 18, fontWeight: 900, color: "var(--text)", lineHeight: 1 }}>{pPct}%</span>
-        <span style={{ fontSize: 9, color: "#3fb950", fontWeight: 700, textTransform: "uppercase" }}>pos</span>
+        <span style={{ fontSize: 20, fontWeight: 900, color: "var(--text)", lineHeight: 1 }}>{pPct}%</span>
+        <span style={{ fontSize: 9, color: "var(--green)", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 2 }}>pos</span>
       </div>
     </div>
   );
@@ -177,6 +178,9 @@ function ResultCard({ r }: { r: EnrichedResult }) {
   // News RSS text is always the headline/source repeated — show only the clean
   // GPT summary for news. Fallback body text is for Twitter/Reddit posts only.
   const showBody  = !summary && !isNews && bodyText.length > 20;
+  // News items expose the link via the (clickable) headline; only posts without
+  // a title keep the small corner icon to reach the source.
+  const hasTitle  = !!r.title && isNews && r.title !== r.author;
   return (
     <div className="card" style={{
       padding: "16px 18px",
@@ -206,17 +210,25 @@ function ResultCard({ r }: { r: EnrichedResult }) {
           <span style={{ color: "var(--text-muted)", fontSize: 11, whiteSpace: "nowrap" }}>
             {r.published_at ? formatDistanceToNow(parseISO(r.published_at), { addSuffix: true, locale: es }) : ""}
           </span>
-          {r.url && (
-            <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "var(--text-muted)", display: "flex" }}>
+          {r.url && !hasTitle && (
+            <a href={r.url} target="_blank" rel="noreferrer" style={{ color: "var(--text-muted)", display: "flex" }} title="Abrir fuente">
               <ExternalLink size={13} />
             </a>
           )}
         </div>
       </div>
 
-      {/* Title */}
-      {r.title && ["web", "gnews_ec", "media"].includes(r.platform) && r.title !== r.author && (
-        <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "var(--text)", lineHeight: 1.4 }}>{r.title}</p>
+      {/* Title — clickable link to the article */}
+      {hasTitle && (
+        r.url ? (
+          <a href={r.url} target="_blank" rel="noreferrer" className="title-link"
+            style={{ display: "inline-flex", alignItems: "flex-start", gap: 6, fontWeight: 800, fontSize: 15, marginBottom: 8, lineHeight: 1.4 }}>
+            <span>{r.title}</span>
+            <ExternalLink size={13} style={{ flexShrink: 0, marginTop: 3, opacity: .65 }} />
+          </a>
+        ) : (
+          <p style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "var(--text)", lineHeight: 1.4 }}>{r.title}</p>
+        )
       )}
 
       {/* Summary (GPT, cleaned) or fallback body text */}
@@ -236,8 +248,8 @@ function ResultCard({ r }: { r: EnrichedResult }) {
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: r.likes || r.shares || r.comments ? 10 : 0 }}>
           {r.keywords.slice(0, 5).map((kw, i) => (
             <span key={i} style={{
-              background: "rgba(88,166,255,.1)", color: "#58a6ff",
-              padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600,
+              background: "var(--accent-soft)", color: "var(--accent)",
+              padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700,
             }}>#{kw}</span>
           ))}
         </div>
@@ -411,7 +423,7 @@ export default function SearchPage() {
           @keyframes orb-float-2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-50px,25px) scale(1.05)} 66%{transform:translate(30px,-15px) scale(.98)} }
           @keyframes orb-float-3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(20px,35px) scale(1.06)} }
           @keyframes hero-fade-up { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-          @keyframes badge-pulse  { 0%,100%{box-shadow:0 0 0 0 rgba(91,141,239,.4)} 50%{box-shadow:0 0 0 6px rgba(91,141,239,0)} }
+          @keyframes badge-pulse  { 0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,.4)} 50%{box-shadow:0 0 0 6px rgba(245,166,35,0)} }
           @keyframes grid-drift   { from{background-position:0 0} to{background-position:40px 40px} }
           @keyframes ticker-scroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
           .hero-title  { animation: hero-fade-up .7s ease both; }
@@ -433,36 +445,45 @@ export default function SearchPage() {
 
         {/* Orbs */}
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: "8%",  left: "12%",  width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,141,239,.18) 0%, transparent 70%)", animation: "orb-float-1 12s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", top: "45%", right: "8%",  width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,.15) 0%, transparent 70%)", animation: "orb-float-2 15s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", bottom: "10%", left: "35%", width: 360, height: 360, borderRadius: "50%", background: "radial-gradient(circle, rgba(192,132,252,.10) 0%, transparent 70%)", animation: "orb-float-3 10s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", top: "8%",  left: "12%",  width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,166,35,.16) 0%, transparent 70%)", animation: "orb-float-1 12s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", top: "45%", right: "8%",  width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,146,60,.12) 0%, transparent 70%)", animation: "orb-float-2 15s ease-in-out infinite" }} />
+          <div style={{ position: "absolute", bottom: "10%", left: "35%", width: 360, height: 360, borderRadius: "50%", background: "radial-gradient(circle, rgba(91,157,240,.08) 0%, transparent 70%)", animation: "orb-float-3 10s ease-in-out infinite" }} />
         </div>
 
         {/* Hero content */}
         <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "40px 24px", maxWidth: 720, width: "100%" }}>
 
+          {/* Wordmark + kicker */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 18 }}>
+            <span className="gradient-text" style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: 22, letterSpacing: "0.04em" }}>PULSO</span>
+            <span style={{ width: 1, height: 16, background: "var(--border-strong)" }} />
+            <span className="kicker">Inteligencia de medios</span>
+          </div>
+
           {/* Live badge */}
           <div className="live-badge" style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            background: "rgba(91,141,239,.12)", border: "1px solid rgba(91,141,239,.35)",
-            borderRadius: 20, padding: "5px 14px", marginBottom: 28, fontSize: 11, fontWeight: 700,
-            color: "var(--accent)", letterSpacing: "0.5px", textTransform: "uppercase",
+            display: "inline-flex", alignItems: "center", gap: 7,
+            background: "rgba(245,166,35,.10)", border: "1px solid rgba(245,166,35,.32)",
+            borderRadius: 20, padding: "5px 14px", marginBottom: 26, fontSize: 11, fontWeight: 700,
+            color: "var(--accent)", letterSpacing: "0.06em", textTransform: "uppercase",
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3fb950", display: "inline-block", boxShadow: "0 0 6px #3fb950" }} />
-            Análisis en tiempo real · IA activa
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)", display: "inline-block", boxShadow: "0 0 7px var(--green)" }} />
+            En tiempo real · IA activa
           </div>
 
           {/* Headline */}
           <h1 className="hero-title" style={{
-            fontSize: "clamp(28px, 5vw, 52px)", fontWeight: 900, lineHeight: 1.1,
-            marginBottom: 16, letterSpacing: "-1px",
+            fontSize: "clamp(32px, 5.4vw, 58px)", fontWeight: 900, lineHeight: 1.04,
+            marginBottom: 16, letterSpacing: "-0.02em",
           }}>
-            <span style={{ background: "var(--grad-brand)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Inteligencia de medios
-            </span>
+            <span className="gradient-text">El pulso de la conversación</span>
             <br />
-            <span style={{ color: "var(--text)" }}>al instante</span>
+            <span style={{ color: "var(--text)" }}>antes que nadie</span>
           </h1>
+
+          <p className="hero-sub" style={{ color: "var(--text-muted)", fontSize: "clamp(14px, 1.6vw, 17px)", maxWidth: 520, margin: "0 auto 24px", lineHeight: 1.6 }}>
+            Monitorea medios, redes y noticias del Ecuador en un solo lugar. Sentimiento, alcance y voces clave analizados con IA al instante.
+          </p>
 
           {/* Search bar */}
           <div className="hero-search" style={{ marginBottom: 20 }}>
@@ -519,18 +540,57 @@ export default function SearchPage() {
       {isFetching && (
         <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-muted)" }}>
           <style>{`
-            @keyframes lupa-swing {
-              0%   { transform: rotate(-15deg) scale(1);   }
-              25%  { transform: rotate(15deg)  scale(1.1); }
-              50%  { transform: rotate(-10deg) scale(1);   }
-              75%  { transform: rotate(10deg)  scale(1.05);}
-              100% { transform: rotate(-15deg) scale(1);   }
+            /* Lupa mágica — halo deslumbrante, anillo de luz y chispas en órbita */
+            .lupa-stage { position: relative; width: 156px; height: 156px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; }
+
+            .lupa-halo {
+              position: absolute; inset: -8px; border-radius: 50%;
+              background: radial-gradient(circle, rgba(245,166,35,.40) 0%, rgba(245,166,35,.12) 42%, transparent 70%);
+              animation: halo-pulse 2.2s ease-in-out infinite;
             }
-            .lupa-anim { display:inline-block; animation: lupa-swing 1.2s ease-in-out infinite; font-size: 56px; }
+            @keyframes halo-pulse { 0%,100%{ opacity:.45; transform:scale(.82); } 50%{ opacity:1; transform:scale(1.18); } }
+
+            .lupa-ring {
+              position: absolute; inset: 4px; border-radius: 50%;
+              background: conic-gradient(from 0deg, transparent 0deg, rgba(252,211,77,0) 50deg, rgba(252,211,77,.75) 120deg, rgba(245,166,35,0) 210deg, transparent 360deg);
+              filter: blur(10px);
+              animation: ring-spin 3.6s linear infinite;
+            }
+            @keyframes ring-spin { to { transform: rotate(360deg); } }
+
+            .lupa-orbit { position: absolute; inset: 0; animation: orbit-spin 7s linear infinite; }
+            @keyframes orbit-spin { to { transform: rotate(360deg); } }
+            .spark { position: absolute; color: var(--accent-2); filter: drop-shadow(0 0 6px rgba(252,211,77,.9)); }
+            .spark.s1 { top: -2px;  left: 50%; margin-left: -9px; font-size: 18px; animation: twinkle 1.4s 0s    ease-in-out infinite; }
+            .spark.s2 { right: -2px; top: 50%; margin-top: -8px;  font-size: 13px; animation: twinkle 1.4s .35s  ease-in-out infinite; }
+            .spark.s3 { bottom: -2px;left: 50%; margin-left: -9px; font-size: 16px; animation: twinkle 1.4s .7s   ease-in-out infinite; }
+            .spark.s4 { left: -2px;  top: 50%; margin-top: -8px;  font-size: 14px; animation: twinkle 1.4s 1.05s ease-in-out infinite; }
+            @keyframes twinkle { 0%,100%{ opacity:.25; transform:scale(.5); } 50%{ opacity:1; transform:scale(1.25); } }
+
+            .lupa-glyph {
+              position: relative; z-index: 2; font-size: 62px; line-height: 1;
+              animation: lupa-float 2.6s ease-in-out infinite, lupa-glow 1.8s ease-in-out infinite;
+            }
+            @keyframes lupa-float { 0%,100%{ transform: translateY(0) rotate(-7deg); } 50%{ transform: translateY(-9px) rotate(7deg); } }
+            @keyframes lupa-glow {
+              0%,100%{ filter: drop-shadow(0 0 6px rgba(245,166,35,.5)); }
+              50%    { filter: drop-shadow(0 0 22px rgba(252,211,77,.95)) drop-shadow(0 0 44px rgba(245,166,35,.6)); }
+            }
+
             .magic-dots::after { content: ""; animation: magic-dot-anim 1.4s steps(1) infinite; }
             @keyframes magic-dot-anim { 0%{content:"."} 33%{content:".."} 66%{content:"..."} 100%{content:"."} }
           `}</style>
-          <div className="lupa-anim">🔍</div>
+          <div className="lupa-stage">
+            <div className="lupa-halo" />
+            <div className="lupa-ring" />
+            <div className="lupa-orbit">
+              <span className="spark s1">✨</span>
+              <span className="spark s2">✦</span>
+              <span className="spark s3">★</span>
+              <span className="spark s4">✦</span>
+            </div>
+            <div className="lupa-glyph">🔍</div>
+          </div>
           <p style={{ fontSize: 20, fontWeight: 900, marginTop: 20, color: "var(--text)" }}>
             Espera mientras la magia ocurre<span className="magic-dots magic-dot-anim" />
           </p>
@@ -550,7 +610,7 @@ export default function SearchPage() {
       )}
 
       {isError && !isFetching && (
-        <div className="card" style={{ textAlign: "center", padding: 40, color: "#f85149", margin: "0 24px" }}>
+        <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--red)", margin: "0 24px" }}>
           <p style={{ fontSize: 32, marginBottom: 12 }}>⚠️</p>
           <p style={{ fontWeight: 700, fontSize: 15 }}>Error al conectar con el servidor</p>
           <p style={{ fontSize: 13, marginTop: 6 }}>Revisa tu conexión e intenta de nuevo.</p>
@@ -563,10 +623,10 @@ export default function SearchPage() {
           {/* KPI Row */}
           <div className="kpi-grid" style={{ marginBottom: 24 }}>
             <KpiCard icon={<BarChart2 size={18} />}  label="Menciones"   value={s.total}       color="var(--accent)"  sub={`"${data.query}"`} />
-            <KpiCard icon={<span style={{fontSize:16}}>😊</span>} label="Positivo"    value={`${sentPct}%`} color="#3fb950"        sub={`${s.positive} menciones`} trend={sentPct > 50 ? "↑ Bueno" : undefined} />
-            <KpiCard icon={<span style={{fontSize:16}}>😠</span>} label="Negativo"    value={`${negPct}%`}  color="#f85149"        sub={`${s.negative} menciones`} trend={negPct > 40 ? "↑ Alerta" : undefined} />
-            <KpiCard icon={<Globe size={18} />}       label="Alcance"     value={s.reach}       color="#bc8cff"        sub="suma de seguidores" />
-            <KpiCard icon={<Zap size={18} />}         label="Engagement"  value={s.engagement}  color="#e3b341"        sub="likes + RT + replies" />
+            <KpiCard icon={<span style={{fontSize:16}}>😊</span>} label="Positivo"    value={`${sentPct}%`} color="var(--green)"   sub={`${s.positive} menciones`} trend={sentPct > 50 ? "↑ Bueno" : undefined} />
+            <KpiCard icon={<span style={{fontSize:16}}>😠</span>} label="Negativo"    value={`${negPct}%`}  color="var(--red)"     sub={`${s.negative} menciones`} trend={negPct > 40 ? "↑ Alerta" : undefined} />
+            <KpiCard icon={<Globe size={18} />}       label="Alcance"     value={s.reach}       color="var(--violet)"  sub="suma de seguidores" />
+            <KpiCard icon={<Zap size={18} />}         label="Engagement"  value={s.engagement}  color="var(--teal)"    sub="likes + RT + replies" />
           </div>
 
           {/* Main 2-col layout */}
@@ -588,7 +648,7 @@ export default function SearchPage() {
                     background:   "transparent",
                     color:        tab === key ? "var(--text)" : "var(--text-muted)",
                     border:       "none",
-                    borderBottom: `2px solid ${tab === key ? "#58a6ff" : "transparent"}`,
+                    borderBottom: `2px solid ${tab === key ? "var(--accent)" : "transparent"}`,
                     padding:      "8px 14px",
                     fontSize:     13,
                     fontWeight:   tab === key ? 800 : 400,
@@ -599,8 +659,8 @@ export default function SearchPage() {
                   }}>
                     {label}
                     <span style={{
-                      background: tab === key ? "#58a6ff22" : "var(--bg)",
-                      color:      tab === key ? "#58a6ff"   : "var(--text-muted)",
+                      background: tab === key ? "var(--accent-soft)" : "var(--bg)",
+                      color:      tab === key ? "var(--accent)"      : "var(--text-muted)",
                       borderRadius: 20, padding: "1px 7px", fontSize: 11, fontWeight: 700,
                     }}>{count}</span>
                   </button>
@@ -632,17 +692,17 @@ export default function SearchPage() {
 
               {/* Sentiment Donut */}
               <div className="card">
-                <p style={{ fontWeight: 800, fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>
-                  <TrendingUp size={14} color="#58a6ff" /> Sentimiento
+                <p className="section-title" style={{ marginBottom: 16 }}>
+                  <TrendingUp size={15} color="var(--accent)" /> Sentimiento
                 </p>
                 <DonutChart pos={pos} neg={neg} neu={neu} total={all.length} />
 
                 {/* Legend */}
                 <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
                   {[
-                    { label: "Positivo", count: pos, color: "#3fb950", pct: sentPct },
-                    { label: "Neutral",  count: neu, color: "#8b949e", pct: all.length > 0 ? Math.round(neu / all.length * 100) : 0 },
-                    { label: "Negativo", count: neg, color: "#f85149", pct: negPct },
+                    { label: "Positivo", count: pos, color: "var(--green)",   pct: sentPct },
+                    { label: "Neutral",  count: neu, color: "var(--neutral)", pct: all.length > 0 ? Math.round(neu / all.length * 100) : 0 },
+                    { label: "Negativo", count: neg, color: "var(--red)",     pct: negPct },
                   ].map(({ label, count, color, pct }) => (
                     <div key={label}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
@@ -662,8 +722,8 @@ export default function SearchPage() {
 
               {/* Platform breakdown */}
               <div className="card">
-                <p style={{ fontWeight: 800, fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Globe size={14} color="#58a6ff" /> Por Plataforma
+                <p className="section-title" style={{ marginBottom: 14 }}>
+                  <Globe size={15} color="var(--accent)" /> Por Plataforma
                 </p>
                 {SOURCE_KEYS.filter(k => byPlatform[k].length > 0).map(k => {
                   const pct = all.length > 0 ? Math.round(byPlatform[k].length / all.length * 100) : 0;
@@ -684,16 +744,16 @@ export default function SearchPage() {
               {/* Top accounts */}
               {data.top_accounts.length > 0 && (
                 <div className="card">
-                  <p style={{ fontWeight: 800, fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Users size={14} color="#bc8cff" /> Principales Voces
+                  <p className="section-title" style={{ marginBottom: 14 }}>
+                    <Users size={15} color="var(--violet)" /> Principales Voces
                   </p>
                   {data.top_accounts.slice(0, 8).map((acc, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "8px 10px", background: "var(--bg)", borderRadius: 8 }}>
                       {/* Rank badge */}
                       <div style={{
                         width: 24, height: 24, borderRadius: "50%",
-                        background: i < 3 ? ["#e3b341","#8b949e","#cd7f32"][i] + "30" : "var(--border)",
-                        color:      i < 3 ? ["#e3b341","#8b949e","#cd7f32"][i]       : "var(--text-muted)",
+                        background: i < 3 ? ["#f5a623","#c0c6d4","#cd7f32"][i] + "30" : "var(--border)",
+                        color:      i < 3 ? ["#f5a623","#c0c6d4","#cd7f32"][i]       : "var(--text-muted)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 10, fontWeight: 900, flexShrink: 0,
                       }}>#{i + 1}</div>

@@ -91,8 +91,8 @@ export default function MentionsFeed({ projectId }: Props) {
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {m.keywords.slice(0, 5).map((kw: string) => (
                   <span key={kw} style={{
-                    background: "rgba(88,166,255,.1)", color: "#58a6ff",
-                    padding: "1px 7px", borderRadius: 10, fontSize: 10, fontWeight: 600
+                    background: "var(--accent-soft)", color: "var(--accent)",
+                    padding: "1px 7px", borderRadius: 10, fontSize: 10, fontWeight: 700
                   }}>{kw}</span>
                 ))}
               </div>

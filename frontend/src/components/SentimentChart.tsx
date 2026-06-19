@@ -59,11 +59,11 @@ export default function SentimentChart({ data, view = "mentions" }: Props) {
       <AreaChart data={formatted} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
         <defs>
           {[
-            ["mentions", "#58a6ff"],
-            ["positive", "#3fb950"],
-            ["negative", "#f85149"],
-            ["neutral",  "#8b949e"],
-            ["reach",    "#bc8cff"],
+            ["mentions", "#f5a623"],
+            ["positive", "#34d399"],
+            ["negative", "#f87171"],
+            ["neutral",  "#9aa1b0"],
+            ["reach",    "#a78bfa"],
           ].map(([key, color]) => (
             <linearGradient key={key} id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%"  stopColor={color} stopOpacity={0.3} />
@@ -71,24 +71,24 @@ export default function SentimentChart({ data, view = "mentions" }: Props) {
             </linearGradient>
           ))}
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-        <XAxis dataKey="label" tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} />
-        <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} axisLine={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#242833" />
+        <XAxis dataKey="label" tick={{ fill: "#9aa1b0", fontSize: 10 }} tickLine={false} />
+        <YAxis tick={{ fill: "#9aa1b0", fontSize: 10 }} tickLine={false} axisLine={false} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ fontSize: 11, color: "#8b949e" }} />
+        <Legend wrapperStyle={{ fontSize: 11, color: "#9aa1b0" }} />
 
         {view === "mentions" && (
-          <Area type="monotone" dataKey="mentions" name="Menciones" stroke="#58a6ff" fill="url(#grad-mentions)" strokeWidth={2} dot={false} />
+          <Area type="monotone" dataKey="mentions" name="Menciones" stroke="#f5a623" fill="url(#grad-mentions)" strokeWidth={2} dot={false} />
         )}
         {view === "sentiment" && (
           <>
-            <Area type="monotone" dataKey="positive" name="Positivo" stroke="#3fb950" fill="url(#grad-positive)" strokeWidth={1.5} dot={false} />
-            <Area type="monotone" dataKey="negative" name="Negativo" stroke="#f85149" fill="url(#grad-negative)" strokeWidth={1.5} dot={false} />
-            <Area type="monotone" dataKey="neutral"  name="Neutral"  stroke="#8b949e" fill="url(#grad-neutral)"  strokeWidth={1.5} dot={false} />
+            <Area type="monotone" dataKey="positive" name="Positivo" stroke="#34d399" fill="url(#grad-positive)" strokeWidth={1.5} dot={false} />
+            <Area type="monotone" dataKey="negative" name="Negativo" stroke="#f87171" fill="url(#grad-negative)" strokeWidth={1.5} dot={false} />
+            <Area type="monotone" dataKey="neutral"  name="Neutral"  stroke="#9aa1b0" fill="url(#grad-neutral)"  strokeWidth={1.5} dot={false} />
           </>
         )}
         {view === "reach" && (
-          <Area type="monotone" dataKey="reach" name="Alcance" stroke="#bc8cff" fill="url(#grad-reach)" strokeWidth={2} dot={false} />
+          <Area type="monotone" dataKey="reach" name="Alcance" stroke="#a78bfa" fill="url(#grad-reach)" strokeWidth={2} dot={false} />
         )}
       </AreaChart>
     </ResponsiveContainer>
