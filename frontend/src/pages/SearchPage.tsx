@@ -280,11 +280,12 @@ export default function SearchPage() {
   const [dateTo,     setDateTo]     = useState("");
 
   const { data, isFetching, isError, refetch } = useQuery<SearchResponse>({
-    queryKey:  ["live-search", query, sources.join(","), dateFrom],
-    queryFn:   () => doSearch(query, sources, dateFrom || undefined),
-    enabled:   !!query,
-    staleTime: 120_000,
-    retry:     1,
+    queryKey:            ["live-search", query, sources.join(","), dateFrom],
+    queryFn:             () => doSearch(query, sources, dateFrom || undefined),
+    enabled:             !!query,
+    staleTime:           Infinity,
+    refetchOnWindowFocus: false,
+    retry:               1,
   });
 
   const go = () => {
