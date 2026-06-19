@@ -520,7 +520,7 @@ async def _fetch_reddit(client: httpx.AsyncClient, q: str) -> list[RawResult]:
 @router.get("", response_model=SearchResponse)
 async def live_search(
     q:       str = Query(..., min_length=1),
-    sources: str = Query("twitter,web,bluesky,media"),
+    sources: str = Query("twitter,web,media"),
     _user =  Depends(get_current_user),
 ):
     # Parse category filter from query: "categoria: XXX" (accent-insensitive)
@@ -584,12 +584,11 @@ async def live_search(
                 summary=         nlp.get("summary", ""),
             ))
 
-        # Filter by category if requested (confidence >= 0.6, accent-insensitive)
+        # Filter by category if requested (accent-insensitive)
         if category:
             enriched = [
                 r for r in enriched
                 if _normalize(nlp_map.get(r.id, {}).get("category", "")) == _normalize(category)
-                and nlp_map.get(r.id, {}).get("category_confidence", 0) >= 0.6
             ]
 
         # Aggregate summary

@@ -5,7 +5,7 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Search, ExternalLink } from "lucide-react";
 
-const PLATFORMS = ["", "twitter", "youtube", "tiktok", "facebook", "web", "bluesky"];
+const PLATFORMS = ["", "twitter", "youtube", "tiktok", "facebook", "web"];
 const SENTIMENTS = ["", "positive", "negative", "neutral"];
 
 const platformIcon: Record<string, string> = {
@@ -14,7 +14,6 @@ const platformIcon: Record<string, string> = {
   tiktok:   "♪",
   facebook: "f",
   web:      "🌐",
-  bluesky:  "☁",
 };
 
 interface Props { projectId: string }
