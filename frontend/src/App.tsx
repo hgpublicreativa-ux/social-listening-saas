@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { LayoutDashboard, FolderKanban, Search, LogOut, Radio } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Search, LogOut, Activity } from "lucide-react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -24,21 +24,9 @@ function Sidebar({ onNav, activeView }: { onNav: (v: string) => void; activeView
   return (
     <aside className="app-sidebar">
       {/* Brand mark — clickable home button */}
-      <button onClick={() => onNav("search")} style={{
-        width: 40, height: 40, marginBottom: 18,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        borderRadius: 12,
-        background: "var(--grad-brand)",
-        boxShadow: "0 4px 16px var(--accent-glow)",
-        color: "#fff",
-        border: "none",
-        cursor: "pointer",
-        transition: "transform .2s",
-      }}
-      onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-      onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      title="Volver al inicio">
-        <Radio size={20} />
+      <button onClick={() => onNav("search")} className="brand-mark" style={{ marginBottom: 16 }}
+        title="PULSO · Inicio">
+        <Activity size={22} strokeWidth={2.6} />
       </button>
       {NAV_ITEMS.map((item) => (
         <button
@@ -74,7 +62,7 @@ function BottomNav({ onNav, activeView }: { onNav: (v: string) => void; activeVi
         }} style={{
           display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
           background: "transparent", border: "none", cursor: "pointer",
-          color: activeView === item.id ? "#58a6ff" : "var(--text-muted)",
+          color: activeView === item.id ? "var(--accent)" : "var(--text-muted)",
           padding: "6px 12px", borderRadius: 8,
           transition: "color .15s",
           fontSize: 10, fontWeight: activeView === item.id ? 700 : 400,

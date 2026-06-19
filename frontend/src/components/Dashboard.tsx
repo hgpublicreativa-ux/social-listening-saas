@@ -5,7 +5,7 @@ import SentimentChart from "./SentimentChart";
 import MentionsFeed from "./MentionsFeed";
 import AlertsPanel from "./AlertsPanel";
 import { BarChart2, Activity, Users, Calendar } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 
 type ChartView = "mentions" | "sentiment" | "reach";
 
@@ -71,8 +71,9 @@ export default function Dashboard({ projectId, projectName }: Props) {
       {/* Header */}
       <div className="dash-header">
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700 }}>{projectName}</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{rangeLabel} · tiempo real</p>
+          <span className="kicker">Panel del proyecto</span>
+          <h1 style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{projectName}</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 2 }}>{rangeLabel} · tiempo real</p>
         </div>
         <div className="date-controls">
           {/* Preset buttons */}
@@ -139,8 +140,8 @@ export default function Dashboard({ projectId, projectName }: Props) {
 
       {/* Chart */}
       <div className="card">
-        <p style={{ fontWeight: 600, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
-          <Activity size={15} color="#58a6ff" />
+        <p className="section-title" style={{ marginBottom: 14 }}>
+          <Activity size={15} color="var(--accent)" />
           {chartView === "mentions" ? "Volumen de Menciones" : chartView === "sentiment" ? "Distribución de Sentimiento" : "Alcance en el Tiempo"}
         </p>
         <SentimentChart data={series} view={chartView} />
@@ -149,8 +150,8 @@ export default function Dashboard({ projectId, projectName }: Props) {
       {/* Bottom row */}
       <div className="dash-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 500 }}>
-          <p style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-            <BarChart2 size={15} color="#58a6ff" /> Feed de Menciones
+          <p className="section-title">
+            <BarChart2 size={15} color="var(--accent)" /> Feed de Menciones
           </p>
           <MentionsFeed projectId={projectId} />
         </div>
@@ -167,8 +168,8 @@ function TopCreators({ projectId }: { projectId: string }) {
   const { data = [] } = useTopCreators(projectId);
   return (
     <div className="card">
-      <p style={{ fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={15} color="#bc8cff" /> Top Creadores
+      <p className="section-title" style={{ marginBottom: 12 }}>
+        <Users size={15} color="var(--violet)" /> Top Creadores
       </p>
       {data.length === 0 && <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Sin datos aún</p>}
       {data.slice(0, 8).map((creator: any, i: number) => (
@@ -180,7 +181,7 @@ function TopCreators({ projectId }: { projectId: string }) {
               {(creator.followers || 0).toLocaleString()} seguidores · {creator.platform}
             </p>
           </div>
-          <span style={{ fontSize: 11, color: "#bc8cff" }}>{creator.mention_count} menc.</span>
+          <span style={{ fontSize: 11, color: "var(--violet)", fontWeight: 700 }}>{creator.mention_count} menc.</span>
         </div>
       ))}
     </div>

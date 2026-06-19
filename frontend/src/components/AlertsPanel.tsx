@@ -37,9 +37,9 @@ export default function AlertsPanel({ projectId }: Props) {
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Bell size={16} color="#d29922" />
-          <span style={{ fontWeight: 700 }}>Reglas de Alerta</span>
+        <div className="section-title">
+          <Bell size={16} color="var(--accent)" />
+          <span>Reglas de Alerta</span>
         </div>
         <button className="btn-ghost" onClick={() => setShowForm(!showForm)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <Plus size={13} /> Nueva
@@ -90,8 +90,9 @@ export default function AlertsPanel({ projectId }: Props) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{
                 width: 8, height: 8, borderRadius: "50%",
-                background: rule.active ? "#3fb950" : "#8b949e",
+                background: rule.active ? "var(--green)" : "var(--neutral)",
                 display: "inline-block",
+                boxShadow: rule.active ? "0 0 7px var(--green)" : "none",
               }} />
               <button onClick={() => remove.mutate(rule.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
                 <Trash2 size={13} />

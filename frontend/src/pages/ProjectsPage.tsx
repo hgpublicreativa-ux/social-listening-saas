@@ -48,10 +48,11 @@ export default function ProjectsPage({ onSelect }: Props) {
 
   return (
     <div className="page-pad">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Proyectos de Monitoreo</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Cada proyecto rastrea un set de keywords en tus plataformas.</p>
+          <span className="kicker">Monitoreo</span>
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>Proyectos</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 2 }}>Cada proyecto rastrea un set de keywords en tus plataformas.</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} /> Nuevo proyecto
@@ -69,10 +70,11 @@ export default function ProjectsPage({ onSelect }: Props) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {SOURCES.map((s) => (
                   <button key={s} onClick={() => toggleSource(s)} style={{
-                    background: form.sources.includes(s) ? "rgba(88,166,255,.15)" : "var(--bg)",
-                    color: form.sources.includes(s) ? "#58a6ff" : "var(--text-muted)",
-                    border: `1px solid ${form.sources.includes(s) ? "#58a6ff" : "var(--border)"}`,
-                    borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer",
+                    background: form.sources.includes(s) ? "var(--accent-soft)" : "var(--bg)",
+                    color: form.sources.includes(s) ? "var(--accent)" : "var(--text-muted)",
+                    border: `1px solid ${form.sources.includes(s) ? "var(--accent)" : "var(--border)"}`,
+                    borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer",
+                    fontWeight: form.sources.includes(s) ? 700 : 400, transition: "all .15s",
                   }}>{s}</button>
                 ))}
               </div>
@@ -95,7 +97,7 @@ export default function ProjectsPage({ onSelect }: Props) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Radio size={14} color={p.active ? "#3fb950" : "#8b949e"} />
+                  <Radio size={14} color={p.active ? "var(--green)" : "var(--neutral)"} />
                   <span style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</span>
                 </div>
                 <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
@@ -119,10 +121,10 @@ export default function ProjectsPage({ onSelect }: Props) {
                   style={{
                     background: "transparent", border: "1px solid var(--border)",
                     borderRadius: 6, padding: "6px 8px", cursor: "pointer",
-                    color: "#8b949e", display: "flex", alignItems: "center",
+                    color: "var(--neutral)", display: "flex", alignItems: "center",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#f85149"; e.currentTarget.style.color = "#f85149"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "#8b949e"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--red)"; e.currentTarget.style.color = "var(--red)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--neutral)"; }}
                 >
                   <Trash2 size={14} />
                 </button>
